@@ -15,8 +15,9 @@ from urllib.parse import parse_qs, urlsplit
 from zoneinfo import ZoneInfo
 
 from .data import ROOT, Store, parse_csv, utc_now
-from .engine import analyze, backtest, node_call, probabilities
-from .provider import fetch_history
+from .engine import analyze, backtest, node_call, probabilities, params
+from .provider import fetch_history, fetch_recent
+from .prediction import predict, prediction_context
 
 def make_handler(store, access_username=None, access_password=None):
     username=access_username if access_username is not None else os.environ.get('KL8_ACCESS_USERNAME','happy8')
@@ -60,7 +61,7 @@ def make_handler(store, access_username=None, access_password=None):
                 draws=store.draws();latest=draws[-1] if draws else None
                 today=datetime.now(ZoneInfo('Asia/Shanghai')).date()
                 age=(today-datetime.fromisoformat(latest['date']).date()).days if latest else None
-                self.send(200,{'count':len(draws),'first':draws[0] if draws else None,'latest':latest,'ageDays':age,'recent':draws[-20:][::-1],'sources':json.loads((ROOT/'UPSTREAM_SOURCES.json').read_text()),'engines':['kitten','luck8','luckydd','gin-18'],'nonCommercial':True})
+                self.send(200,{'count':len(draws),'first':draws[0] if draws else None,'latest':latest,'ageDays':age,'recent':draws[-20:][::-1],'sources':json.loads((ROOT/'UPSTREAM_SOURCES.json').read_text()),'engines':['kitten','luck8','luckydd','gin-18'],'nonCommercial':True,'prediction':prediction_context(draws)})
             elif url.path=='/api/analysis':
                 self.send(200,analyze(store.draws(),int(q.get('k',[10])[0]),int(q.get('window',[120])[0])))
             elif url.path=='/api/experiments':
@@ -87,7 +88,27 @@ def make_handler(store, access_username=None, access_password=None):
             if not 0<size<=2_000_000: return self.send(413,{'error':'请求大小不合法（上限2MB）'})
             body=json.loads(self.rfile.read(size))
             route=urlsplit(self.path).path
-            if route=='/api/backtest':
+            if route=='/api/predict':
+                k=body.get('k',10);window=body.get('window',120)
+                params(k,window)
+                sync=body.get('sync',True)
+                if type(sync) is not bool: raise ValueError('sync 必须为布尔值')
+                sync_result={'status':'skipped'}
+                if sync:
+                    try:
+                        fetched=fetch_recent()
+                        sync_result={'status':'ok',**store.import_draws(fetched['draws'],fetched['source'])}
+                    except Exception as exc:
+                        sync_result={'status':'error','message':'在线更新失败，使用库内数据。'+str(exc)}
+                with store.connect() as conn:
+                    conn.execute('BEGIN IMMEDIATE')
+                    result=predict(store.draws(conn),k,window,body.get('targetIssue'))
+                    result['sync']=sync_result
+                    cursor=conn.execute('INSERT INTO experiments(created_at,target_issue,as_of_issue,data_hash,payload) VALUES(?,?,?,?,?)',
+                        (result['generatedAt'],result['targetIssue'],result['asOfIssue'],result['dataHash'],json.dumps(result)))
+                    result['recordId']=cursor.lastrowid
+                self.send(201,result)
+            elif route=='/api/backtest':
                 self.send(200,backtest(store.draws(),body.get('k',10),body.get('window',120),body.get('folds',30),body.get('seed',20261018)))
             elif route=='/api/import':
                 rows=parse_csv(body['csv']) if 'csv' in body else body['draws']

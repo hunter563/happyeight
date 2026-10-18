@@ -48,7 +48,7 @@ def parse_gin(payload):
         raise ValueError('汇鸟接口未返回有效开奖数据')
     return [normalize({'issue':r['code'],'date':r['day'],'numbers':[r[field] for field in FIELDS]}) for r in rows]
 
-def fetch_gin():
+def fetch_gin(max_pages=None):
     draws=[];seen=set();page=1;pages=1
     while page<=pages:
         url=f'https://api.huiniao.top/interface/home/lotteryHistory?type=klb&page={page}&limit=500'
@@ -68,6 +68,7 @@ def fetch_gin():
         if page==1:
             pages=int(payload['data']['data'].get('totalPage',1))
             if not 1<=pages<=20:raise ValueError('数据源分页数量异常')
+            if max_pages is not None:pages=min(pages,max_pages)
         if any(r['issue'] in seen for r in rows):raise ValueError('数据源分页重复，本次未导入')
         seen.update(r['issue'] for r in rows);draws.extend(rows)
         page+=1
@@ -81,3 +82,12 @@ def fetch_history():
         except Exception as exc:
             failures.append(source+': '+type(exc).__name__)
     raise RuntimeError('在线数据源均不可用，请导入CSV/JSON；已有数据保持不变。'+'；'.join(failures))
+
+def fetch_recent():
+    """预测前只更新最近一页；完整历史同步仍通过 fetch_history。"""
+    for source,fetcher in [('汇鸟公开接口（gin-18/lottery数据源）',fetch_gin),('中彩网在线接口',fetch_zhcw)]:
+        try:
+            return {'draws':fetcher(max_pages=1),'source':source}
+        except Exception:
+            continue
+    raise RuntimeError('在线更新暂不可用，本次只能使用已保存的数据')

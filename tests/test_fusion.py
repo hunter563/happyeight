@@ -17,6 +17,7 @@ from fusion import engine
 from fusion.data import Store,normalize,fingerprint,parse_csv
 from fusion.server import make_handler
 from fusion.provider import parse_gin,fetch_history,fetch_gin,FIELDS
+from fusion.prediction import predict,prediction_context
 
 def sample(count=90):
     rng=random.Random(77)
@@ -87,6 +88,14 @@ class EngineTests(unittest.TestCase):
             with self.assertRaises(ValueError):engine.analyze(sample(),k,window)
 
 class ProviderTests(unittest.TestCase):
+    def test_prediction_update_fetches_only_recent_page(self):
+        row=sample(1)[0]
+        raw={'code':row['issue'],'day':row['date'],**dict(zip(FIELDS,map(str,row['numbers'])))}
+        stream=io.BytesIO(json.dumps({'code':1,'data':{'data':{'list':[raw],'totalPage':5}}}).encode())
+        stream.url='https://api.huiniao.top/interface/home/lotteryHistory'
+        with patch('fusion.provider.urllib.request.urlopen',return_value=stream) as request:
+            self.assertEqual(fetch_gin(max_pages=1),[row])
+            self.assertEqual(request.call_count,1)
     def test_gin_follows_actual_pagination(self):
         pages=[]
         for row in sample(2):
@@ -108,6 +117,28 @@ class ProviderTests(unittest.TestCase):
                 result=fetch_history();self.assertEqual(result['source'],'中彩网在线接口')
                 self.assertEqual(len(result['draws']),1)
 
+class PredictionTests(unittest.TestCase):
+    def test_target_and_stale_data_guard(self):
+        draws=sample(90)
+        day=date.fromisoformat(draws[-1]['date'])
+        r=predict(draws,k=5,window=60,today=day+timedelta(days=1))
+        self.assertEqual(r['targetIssue'],'2024091')
+        self.assertTrue(r['targetInferred'])
+        self.assertEqual(len(r['selections']['fusion']),5)
+        with self.assertRaisesRegex(ValueError,'不能确定实时下一期'):
+            predict(draws,today=day+timedelta(days=4))
+        old=predict(draws,target_issue='2024091',today=day+timedelta(days=4))
+        self.assertTrue(old['freshness']['stale']);self.assertFalse(old['targetInferred'])
+        with self.assertRaisesRegex(ValueError,'晚于'):
+            predict(draws,target_issue=draws[-1]['issue'],today=day)
+
+    def test_year_boundary_requires_explicit_issue(self):
+        draws=[{'issue':'2024351','date':'2024-12-31','numbers':list(range(1,21))}]
+        for today in [date(2024,12,31),date(2025,1,1)]:
+            self.assertIsNone(prediction_context(draws,today)['suggestedNextIssue'])
+            with self.assertRaisesRegex(ValueError,'跨年'):
+                predict(draws,today=today)
+
 class ApiTests(unittest.TestCase):
     def setUp(self):
         self.temp=tempfile.TemporaryDirectory();self.store=Store(Path(self.temp.name)/'api.sqlite')
@@ -123,7 +154,7 @@ class ApiTests(unittest.TestCase):
         with urllib.request.urlopen(req) as r:return r.status,json.loads(r.read())
     def test_cloud_auth_protects_pages_reads_and_writes(self):
         self.server.RequestHandlerClass=make_handler(self.store, 'happy8', 'test-password-123456')
-        for path,body in [('/',None),('/app.js',None),('/api/status',None),('/api/experiments',{'targetIssue':'2024151'})]:
+        for path,body in [('/',None),('/app.js',None),('/api/status',None),('/api/experiments',{'targetIssue':'2024151'}),('/api/predict',{'sync':False})]:
             with self.assertRaises(urllib.error.HTTPError) as cm:self.request(path,body)
             self.assertEqual(cm.exception.code,401)
             self.assertIn('Basic',cm.exception.headers['WWW-Authenticate'])
@@ -149,6 +180,32 @@ class ApiTests(unittest.TestCase):
         result=self.store.experiments()[0]
         self.assertTrue(result['settled']);self.assertEqual(result['data_hash'],snapshot)
         self.assertEqual(len(result['hits']),5)
+    def test_predict_sync_target_save_and_settle(self):
+        incoming=sample(151)[-1]
+        with patch('fusion.server.fetch_recent',return_value={'draws':[incoming],'source':'test-online'}):
+            with patch('fusion.prediction.prediction_context',side_effect=lambda draws,today=None:prediction_context(draws,today=date(2024,5,30))):
+                status,r=self.request('/api/predict',{'k':5,'window':60})
+        self.assertEqual(status,201)
+        self.assertEqual(r['targetIssue'],'2024152')
+        self.assertEqual(r['asOfIssue'],'2024151')
+        self.assertEqual(r['sync']['inserted'],1)
+        saved=self.store.experiments()[0]
+        self.assertEqual(saved['id'],r['recordId'])
+        self.assertEqual(saved['payload']['selections'],r['selections'])
+        self.assertEqual(saved['data_hash'],r['dataHash'])
+        actual=sample(152)[-1];self.store.import_draws([actual],'test')
+        settled=self.store.experiments()[0]
+        self.assertTrue(settled['settled'])
+        self.assertEqual(settled['hits']['fusion'],len(set(actual['numbers'])&set(r['selections']['fusion'])))
+
+    def test_predict_offline_fresh_data_warns_and_invalid_params_skip_network(self):
+        with patch('fusion.server.fetch_recent',side_effect=RuntimeError('offline')) as source:
+            with patch('fusion.prediction.prediction_context',side_effect=lambda draws,today=None:prediction_context(draws,today=date(2024,5,29))):
+                status,r=self.request('/api/predict',{'k':3,'window':60})
+            self.assertEqual(status,201);self.assertEqual(r['sync']['status'],'error')
+            self.assertEqual(source.call_count,1)
+            with self.assertRaises(urllib.error.HTTPError) as cm:self.request('/api/predict',{'k':11})
+            self.assertEqual(cm.exception.code,400);self.assertEqual(source.call_count,1)
     def test_past_target_and_cross_origin_rejected(self):
         for body,origin,code in [({'targetIssue':'2024001'},None,400),({},'https://unrelated.example',403)]:
             with self.assertRaises(urllib.error.HTTPError) as cm:self.request('/api/experiments',body,origin)

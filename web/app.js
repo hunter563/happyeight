@@ -7,9 +7,17 @@ const metric=(label,value,note='')=>`<div class="metric"><small>${esc(label)}</s
 function message(text,error=false){$('message').textContent=text;$('message').classList.toggle('error',error);}
 async function api(url,body){const r=await fetch(url,body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{});const data=await r.json();if(!r.ok)throw new Error(data.error||'请求失败');return data;}
 async function busy(id,task){const button=$(id),old=button.textContent;button.disabled=true;button.textContent='处理中…';try{await task();}catch(e){message(e.message,true);}finally{button.disabled=false;button.textContent=old;}}
-for(const id of ['analysis-k','test-k','calc-k','lock-k'])$(id).innerHTML=Array.from({length:10},(_,i)=>`<option value="${i+1}" ${i===9?'selected':''}>选 ${i+1}</option>`).join('');
-document.querySelectorAll('[data-tab]').forEach(button=>button.addEventListener('click',()=>{document.querySelectorAll('[data-tab]').forEach(b=>b.classList.toggle('active',b===button));document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('active',p.id===button.dataset.tab));if(button.dataset.tab==='records')loadRecords().catch(e=>message(e.message,true));}));
-async function refresh(){const s=await api('/api/status');$('metrics').innerHTML=metric('有效历史样本',s.count.toLocaleString(),'每期20个号码')+metric('数据截止期',s.latest?.issue??'暂无','已保存来源信息')+metric('最新数据日期',s.latest?.date??'暂无',s.ageDays>1?`距今天 ${s.ageDays} 天，请更新`:'检查当日开奖时间')+metric('已接入项目','4 / 4','3个分析分支 + 1套统计规则');$('draw-label').textContent=s.latest?`${s.latest.issue} · ${s.latest.date}`:'暂无数据';$('latest-balls').innerHTML=s.latest?balls(s.latest.numbers):'';$('source-note').textContent=s.latest?`来源：${s.latest.source}`:'请导入数据';$('history').innerHTML=s.recent.map(d=>`<tr><td>${esc(d.issue)}</td><td>${esc(d.date)}</td><td class="numbers">${d.numbers.map(n=>String(n).padStart(2,'0')).join(' ')}</td></tr>`).join('');if(s.ageDays>1)message(`当前使用截至 ${s.latest.date} 的历史数据，不是最新开奖结果。可同步在线数据或导入文件。`);}
+for(const id of ['predict-k','analysis-k','test-k','calc-k','lock-k'])$(id).innerHTML=Array.from({length:10},(_,i)=>`<option value="${i+1}" ${i===9?'selected':''}>选 ${i+1}</option>`).join('');
+function selectTab(name){
+  if(!['prediction','overview','analysis','backtest','calculator','records'].includes(name))name='prediction';
+  document.querySelectorAll('[data-tab]').forEach(b=>b.classList.toggle('active',b.dataset.tab===name));
+  document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('active',p.id===name));
+  if(name==='records')loadRecords().catch(e=>message(e.message,true));
+}
+document.querySelectorAll('[data-tab]').forEach(button=>button.addEventListener('click',()=>{location.hash=button.dataset.tab;selectTab(button.dataset.tab);}));
+window.addEventListener('hashchange',()=>selectTab(location.hash.slice(1)));
+selectTab(location.hash.slice(1));
+async function refresh(){const s=await api('/api/status');$('prediction-context').textContent=s.latest?`当前数据截至 ${s.latest.issue} 期（${s.latest.date}）；${s.prediction.suggestedNextIssue?'按库内末期推算为 '+s.prediction.suggestedNextIssue+' 期。':'需核对目标期号。'}`:'请先同步或导入开奖数据';$('predict-issue').placeholder=s.prediction.suggestedNextIssue?`自动推算：${s.prediction.suggestedNextIssue}`:'请核对后填写目标期号';$('metrics').innerHTML=metric('有效历史样本',s.count.toLocaleString(),'每期20个号码')+metric('数据截止期',s.latest?.issue??'暂无','已保存来源信息')+metric('最新数据日期',s.latest?.date??'暂无',s.ageDays>1?`距今天 ${s.ageDays} 天，请更新`:'检查当日开奖时间')+metric('已接入项目','4 / 4','3个分析分支 + 1套统计规则');$('draw-label').textContent=s.latest?`${s.latest.issue} · ${s.latest.date}`:'暂无数据';$('latest-balls').innerHTML=s.latest?balls(s.latest.numbers):'';$('source-note').textContent=s.latest?`来源：${s.latest.source}`:'请导入数据';$('history').innerHTML=s.recent.map(d=>`<tr><td>${esc(d.issue)}</td><td>${esc(d.date)}</td><td class="numbers">${d.numbers.map(n=>String(n).padStart(2,'0')).join(' ')}</td></tr>`).join('');if(s.ageDays>1)message(`当前使用截至 ${s.latest.date} 的历史数据，不是最新开奖结果。可同步在线数据或导入文件。`);}
 $('sync').onclick=()=>busy('sync',async()=>{message('正在请求在线数据源，请稍候；已有数据会保留。');const r=await api('/api/sync',{});await refresh();message(`同步完成：新增 ${r.inserted} 期，重复 ${r.duplicates} 期。`);});
 $('import-file').onchange=async event=>{const file=event.target.files[0];if(!file)return;try{if(file.size>1_800_000)throw new Error('文件过大，请拆分到1.8MB以内');const text=await file.text();const r=await api('/api/import',file.name.endsWith('.json')?{draws:JSON.parse(text)}:{csv:text});await refresh();message(`导入完成：新增 ${r.inserted} 期，重复 ${r.duplicates} 期。`);}catch(e){message(e.message,true);}event.target.value='';};
 function selections(s){return `<div class="selection-grid">${['fusion','kitten','luck8','luckydd','random'].map(name=>`<div class="selection-card ${name}"><b>${names[name]}</b>${balls(s[name])}</div>`).join('')}</div>`;}
@@ -19,3 +27,19 @@ $('run-calc').onclick=()=>busy('run-calc',async()=>{const r=await api('/api/calc
 async function loadRecords(){const rows=await api('/api/experiments');const el=$('records-result');el.classList.toggle('empty',!rows.length);el.innerHTML=rows.length?rows.map(r=>`<div class="record"><div class="section-head"><h2>#${r.id} · 目标 ${esc(r.target_issue)}</h2><span>${r.settled?'已匹配开奖':'等待开奖数据'}</span></div><p class="muted">锁定于 ${esc(r.created_at)} · 数据截至 ${r.as_of_issue}</p><code>SHA-256 ${esc(r.data_hash)}</code>${selections(r.payload.selections)}${r.settled?`<p>实测命中：${Object.entries(r.hits).map(([n,h])=>`${names[n]} ${h}/${r.payload.k}`).join(' · ')}</p>`:''}</div>`).join(''):'尚无锁定记录';}
 $('lock').onclick=()=>busy('lock',async()=>{const r=await api('/api/experiments',{targetIssue:$('target-issue').value.trim(),k:num('lock-k'),window:120});await loadRecords();message(`已锁定实验 #${r.id}，目标期号 ${r.targetIssue}。`);});
 refresh().catch(e=>message(e.message,true));
+
+$('run-predict').onclick=()=>busy('run-predict',async()=>{
+  const progress=$('prediction-progress'),el=$('prediction-result');
+  progress.className='prediction-progress';
+  el.className='empty';el.textContent='等待本次预测结果…';
+  progress.textContent=$('predict-sync').checked?'正在更新最近开奖，并调用分析引擎；请稍候…':'正在基于已保存的数据生成预测…';
+  try{
+    const r=await api('/api/predict',{k:num('predict-k'),window:num('predict-window'),targetIssue:$('predict-issue').value.trim()||null,sync:$('predict-sync').checked});
+    el.className='prediction-result';
+    const syncText=r.sync.status==='ok'?`已更新数据，新增 ${r.sync.inserted} 期。`:r.sync.status==='error'?r.sync.message:'未联网更新，使用已保存的数据。';
+    el.innerHTML=`<div class="prediction-heading"><div><small>本次预测目标</small><h2>第 ${esc(r.targetIssue)} 期</h2></div><span>已保存 · #${r.recordId}</span></div><p class="muted">依据截至 ${esc(r.asOfIssue)} 期（${esc(r.asOfDate)}）的 ${r.window} 期历史，生成 ${r.k} 个号码。${esc(r.targetNote)}</p><div class="note ${r.sync.status==='error'||r.freshness.stale?'prediction-warning':''}">${esc(syncText)}${r.freshness.stale?' 数据较旧，本次属于历史数据研究，不能确认是实时下一期预测。':''}</div>${selections(r.selections)}<div class="prediction-actions"><a class="button secondary" href="#records">查看预测记录与开奖复盘</a><a class="button secondary" href="#backtest">检验历史回测表现</a></div><p class="muted">保存时间：${esc(new Date(r.generatedAt).toLocaleString('zh-CN'))}。记录证明本次使用的库内数据，不能单独证明早于真实开奖。</p>`;
+    progress.textContent=`第 ${r.targetIssue} 期预测已生成并保存。`;
+    message(`预测完成：第 ${r.targetIssue} 期，记录 #${r.recordId}。`);
+    try{await refresh();}catch(e){message('预测已保存，但数据概览刷新失败：'+e.message,true);}
+  }catch(e){el.textContent='本次未生成预测。';progress.textContent=e.message;progress.classList.add('prediction-warning');throw e;}
+});
