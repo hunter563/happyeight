@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">LuckyDD</string>
+    <string name="title_activity_main">LuckyDD</string>
+    <string name="package_name">com.luckydd.app</string>
+    <string name="custom_url_scheme">com.luckydd.app</string>
+</resources>

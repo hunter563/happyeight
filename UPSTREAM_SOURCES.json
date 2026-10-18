@@ -1,0 +1,22 @@
+[
+  {
+    "directory": "vendor/kl8-analyzer",
+    "url": "https://github.com/KittenCN/kl8-lottery-analyzer.git",
+    "commit": "46d98bab9259b8b46fcd8b76f54414c0de1193ba"
+  },
+  {
+    "directory": "vendor/luck8",
+    "url": "https://github.com/fightingfor/Luck8.git",
+    "commit": "2552e74c2ab2541eac1784efd2d425a18b674983"
+  },
+  {
+    "directory": "vendor/luckydd",
+    "url": "https://github.com/FanKang2021/LuckyDD.git",
+    "commit": "2ad2a5a503a19743c346aeb8b5f20105cca22712"
+  },
+  {
+    "directory": "vendor/lottery-lab",
+    "url": "https://github.com/gin-18/lottery.git",
+    "commit": "b78afa184100a77654b8f98dcd8efa076190161a"
+  }
+]

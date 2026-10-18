@@ -1,0 +1,40 @@
+name: kl8_predictor_app
+description: A KL8 lottery number predictor app.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.2
+  # 数据库相关
+  sqflite: ^2.3.0
+  path: ^1.8.3
+  # 状态管理
+  provider: ^6.0.5
+  # 网络请求
+  dio: ^5.3.2
+  # 日期处理
+  intl: ^0.18.1
+  # 数据计算
+  ml_linalg: ^13.11.29
+  collection: ^1.17.2
+  # UI相关
+  flutter_spinkit: ^5.2.0
+  animated_text_kit: ^4.2.2
+  fl_chart: ^0.63.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^2.0.0
+
+flutter:
+  uses-material-design: true
+  
+  assets:
+    - assets/data/
+    - assets/images/ 
