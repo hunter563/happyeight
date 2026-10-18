@@ -39,7 +39,15 @@ python run.py
 
 打开 **http://127.0.0.1:8768**。Windows 安装好 Python 和 Node.js 后，也可双击 `start.bat`。
 
-默认仅监听本机。`--port` 可改端口，`--database` 可改数据库路径，`--no-seed` 可跳过内置数据。`KL8_NODE` 可指定 Node.js 路径。不提供公网账号认证，不应把这个个人研究版直接暴露到公网。
+默认仅监听本机。`--port` 可改端口，`--database` 可改数据库路径，`--no-seed` 可跳过内置数据。`KL8_NODE` 可指定 Node.js 路径。
+
+## 云端个人试用
+
+仓库包含 Dockerfile 与 Railway 配置，可部署完整 Python/Node 分析引擎。设置 `KL8_ACCESS_PASSWORD`（至少16字符），用户名默认为 `happy8`，可用 `KL8_ACCESS_USERNAME` 修改。只通过 HTTPS 访问，浏览器会提示输入账号密码。密码存于部署环境变量，不能提交到仓库。
+
+容器默认开启 `KL8_REQUIRE_AUTH=1`，未配置足够长度的密码会拒绝启动。所有页面、静态资源和数据接口均受认证保护，仅 `/api/health` 返回不含数据的健康状态。未设置密码的本机启动方式保持不变。
+
+挂载持久化卷至 `/data`，数据库位于 `/data/fusion.sqlite`，重启和更新后保留导入数据及锁定记录。此版本用于单人试用，不提供多个用户的数据隔离。建议单实例、1GB内存；空闲时可在 Railway 开启休眠。
 
 ## 数据与验证边界
 

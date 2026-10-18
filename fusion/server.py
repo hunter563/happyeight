@@ -1,5 +1,7 @@
-"""仅供本机个人研究的 HTTP 服务；单入口调用四项目适配层。"""
+"""个人研究 HTTP 服务；云端试用使用可选的 HTTP Basic 访问认证。"""
 import argparse
+import base64
+import hmac
 import json
 import mimetypes
 import os
@@ -16,17 +18,29 @@ from .data import ROOT, Store, parse_csv, utc_now
 from .engine import analyze, backtest, node_call, probabilities
 from .provider import fetch_history
 
-def make_handler(store):
+def make_handler(store, access_username=None, access_password=None):
+    username=access_username if access_username is not None else os.environ.get('KL8_ACCESS_USERNAME','happy8')
+    password=access_password if access_password is not None else os.environ.get('KL8_ACCESS_PASSWORD','')
+    expected=base64.b64encode(f'{username}:{password}'.encode())
     class Handler(BaseHTTPRequestHandler):
-        def send(self,status,payload,content_type='application/json; charset=utf-8'):
+        def send(self,status,payload,content_type='application/json; charset=utf-8',headers=None):
             data=payload if isinstance(payload,bytes) else json.dumps(payload,ensure_ascii=False,allow_nan=False).encode()
             self.send_response(status)
             self.send_header('Content-Type',content_type)
             self.send_header('Content-Length',str(len(data)))
             self.send_header('X-Content-Type-Options','nosniff')
             self.send_header('Cache-Control','no-store')
+            self.send_header('Referrer-Policy','no-referrer')
             self.send_header('Content-Security-Policy',"default-src 'self'; style-src 'self'; script-src 'self'; connect-src 'self'; img-src 'self' data:; frame-ancestors 'none'")
+            for key,value in (headers or {}).items(): self.send_header(key,value)
             self.end_headers();self.wfile.write(data)
+
+        def authorized(self):
+            if not password: return True
+            scheme,_,value=self.headers.get('Authorization','').partition(' ')
+            if scheme.lower()=='basic' and hmac.compare_digest(value.encode(),expected): return True
+            self.send(401,{'error':'请输入试用账号和密码'},headers={'WWW-Authenticate':'Basic realm="HappyEight", charset="UTF-8"'})
+            return False
 
         def guarded(self,callback):
             try: callback()
@@ -36,7 +50,9 @@ def make_handler(store):
                 self.send(503,{'error':str(exc)})
 
         def do_GET(self):
-            self.guarded(self.get)
+            if urlsplit(self.path).path=='/api/health':
+                return self.send(200,{'ok':True})
+            if self.authorized(): self.guarded(self.get)
 
         def get(self):
             url=urlsplit(self.path); q=parse_qs(url.query)
@@ -58,7 +74,7 @@ def make_handler(store):
                 self.send(200,path.read_bytes(),(mimetypes.guess_type(name)[0] or 'text/plain')+'; charset=utf-8')
 
         def do_POST(self):
-            self.guarded(self.post)
+            if self.authorized(): self.guarded(self.post)
 
         def post(self):
             host=self.headers.get('Host','')
@@ -103,6 +119,8 @@ def main():
     parser.add_argument('--no-seed',action='store_true',help='不导入随仓库附带的历史快照')
     parser.add_argument('--open-browser',action='store_true',help='启动后打开本机网页')
     args=parser.parse_args()
+    if os.environ.get('KL8_REQUIRE_AUTH')=='1' and len(os.environ.get('KL8_ACCESS_PASSWORD',''))<16:
+        parser.error('云端运行需要至少16字符的 KL8_ACCESS_PASSWORD')
     store=Store(Path(args.database))
     if not args.no_seed: store.seed()
     server=ThreadingHTTPServer((args.host,args.port),make_handler(store))

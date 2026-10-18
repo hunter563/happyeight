@@ -1,4 +1,5 @@
 import copy
+import base64
 import io
 import json
 import random
@@ -120,6 +121,23 @@ class ApiTests(unittest.TestCase):
         if origin:headers['Origin']=origin
         req=urllib.request.Request(self.base+path,data=json.dumps(body).encode() if body is not None else None,headers=headers)
         with urllib.request.urlopen(req) as r:return r.status,json.loads(r.read())
+    def test_cloud_auth_protects_pages_reads_and_writes(self):
+        self.server.RequestHandlerClass=make_handler(self.store, 'happy8', 'test-password-123456')
+        for path,body in [('/',None),('/app.js',None),('/api/status',None),('/api/experiments',{'targetIssue':'2024151'})]:
+            with self.assertRaises(urllib.error.HTTPError) as cm:self.request(path,body)
+            self.assertEqual(cm.exception.code,401)
+            self.assertIn('Basic',cm.exception.headers['WWW-Authenticate'])
+        self.assertEqual(self.store.experiments(),[])
+        for value in ['Basic !!!','Basic '+base64.b64encode(b'happy8:wrong').decode()]:
+            with self.assertRaises(urllib.error.HTTPError) as cm:
+                urllib.request.urlopen(urllib.request.Request(self.base+'/api/status',headers={'Authorization':value}))
+            self.assertEqual(cm.exception.code,401)
+        token=base64.b64encode(b'happy8:test-password-123456').decode()
+        req=urllib.request.Request(self.base+'/api/status',headers={'Authorization':'Basic '+token})
+        with urllib.request.urlopen(req) as response:self.assertEqual(json.loads(response.read())['count'],150)
+        status,payload=self.request('/api/health')
+        self.assertEqual((status,payload),(200,{'ok':True}))
+
     def test_status_and_analysis(self):
         _,r=self.request('/api/status');self.assertEqual(r['count'],150)
         _,r=self.request('/api/analysis?k=3&window=60');self.assertEqual(len(r['selections']['fusion']),3)
