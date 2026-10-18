@@ -1,0 +1,315 @@
+{
+  "asOfIssue": "2026276",
+  "asOfDate": "2026-10-17",
+  "window": 500,
+  "folds": 100,
+  "k": 10,
+  "beforeVersion": "0.1.0 reciprocal-date weighting",
+  "afterVersion": "0.3.0",
+  "changes": "Luck8 analyze_frequency weight_recent True -> False; other score branches and equal fusion unchanged",
+  "period": {
+    "first": "2026177",
+    "last": "2026276"
+  },
+  "comparison": {
+    "before": {
+      "current10": {
+        "kitten": [
+          2,
+          9,
+          31,
+          35,
+          44,
+          45,
+          51,
+          54,
+          65,
+          73
+        ],
+        "luck8": [
+          11,
+          15,
+          27,
+          37,
+          38,
+          45,
+          51,
+          65,
+          67,
+          73
+        ],
+        "luckydd": [
+          11,
+          14,
+          16,
+          26,
+          27,
+          33,
+          43,
+          55,
+          62,
+          80
+        ],
+        "fusion": [
+          2,
+          11,
+          27,
+          35,
+          37,
+          45,
+          51,
+          62,
+          65,
+          73
+        ],
+        "random": [
+          8,
+          9,
+          15,
+          26,
+          29,
+          35,
+          43,
+          59,
+          65,
+          70
+        ]
+      },
+      "currentOverlap10": {
+        "kitten": 5,
+        "luck8": 10,
+        "luckydd": 3,
+        "fusion": 9,
+        "random": 2
+      },
+      "current4": {
+        "kitten": [
+          31,
+          35,
+          51,
+          73
+        ],
+        "luck8": [
+          38,
+          51,
+          65,
+          73
+        ],
+        "luckydd": [
+          27,
+          33,
+          62,
+          80
+        ],
+        "fusion": [
+          51,
+          62,
+          65,
+          73
+        ],
+        "random": [
+          9,
+          26,
+          43,
+          59
+        ]
+      },
+      "currentOverlap4": {
+        "kitten": 2,
+        "luck8": 4,
+        "luckydd": 2,
+        "fusion": 4,
+        "random": 0
+      },
+      "backtestSummary": {
+        "kitten": {
+          "meanHits": 2.48,
+          "meanPreviousOverlap": 4.55,
+          "totalHits": 248,
+          "hitRate": 0.248,
+          "deltaFromRandomExpectation": -0.020000000000000018
+        },
+        "luck8": {
+          "meanHits": 2.44,
+          "meanPreviousOverlap": 9.68,
+          "totalHits": 244,
+          "hitRate": 0.244,
+          "deltaFromRandomExpectation": -0.06000000000000005
+        },
+        "luckydd": {
+          "meanHits": 2.37,
+          "meanPreviousOverlap": 2.7,
+          "totalHits": 237,
+          "hitRate": 0.23700000000000002,
+          "deltaFromRandomExpectation": -0.1299999999999999
+        },
+        "fusion": {
+          "meanHits": 2.5,
+          "meanPreviousOverlap": 6.79,
+          "totalHits": 250,
+          "hitRate": 0.25,
+          "deltaFromRandomExpectation": 0.0
+        },
+        "random": {
+          "meanHits": 2.7,
+          "meanPreviousOverlap": 2.23,
+          "totalHits": 270,
+          "hitRate": 0.27,
+          "deltaFromRandomExpectation": 0.20000000000000018
+        }
+      }
+    },
+    "after": {
+      "current10": {
+        "kitten": [
+          2,
+          9,
+          31,
+          35,
+          44,
+          45,
+          51,
+          54,
+          65,
+          73
+        ],
+        "luck8": [
+          2,
+          8,
+          11,
+          14,
+          26,
+          27,
+          33,
+          50,
+          55,
+          62
+        ],
+        "luckydd": [
+          11,
+          14,
+          16,
+          26,
+          27,
+          33,
+          43,
+          55,
+          62,
+          80
+        ],
+        "fusion": [
+          2,
+          11,
+          27,
+          33,
+          35,
+          50,
+          55,
+          62,
+          73,
+          80
+        ],
+        "random": [
+          8,
+          9,
+          15,
+          26,
+          29,
+          35,
+          43,
+          59,
+          65,
+          70
+        ]
+      },
+      "currentOverlap10": {
+        "kitten": 5,
+        "luck8": 4,
+        "luckydd": 3,
+        "fusion": 5,
+        "random": 2
+      },
+      "current4": {
+        "kitten": [
+          31,
+          35,
+          51,
+          73
+        ],
+        "luck8": [
+          11,
+          14,
+          27,
+          62
+        ],
+        "luckydd": [
+          27,
+          33,
+          62,
+          80
+        ],
+        "fusion": [
+          11,
+          27,
+          62,
+          73
+        ],
+        "random": [
+          9,
+          26,
+          43,
+          59
+        ]
+      },
+      "currentOverlap4": {
+        "kitten": 2,
+        "luck8": 3,
+        "luckydd": 2,
+        "fusion": 4,
+        "random": 0
+      },
+      "backtestSummary": {
+        "kitten": {
+          "meanHits": 2.48,
+          "meanPreviousOverlap": 4.55,
+          "totalHits": 248,
+          "hitRate": 0.248,
+          "deltaFromRandomExpectation": -0.020000000000000018
+        },
+        "luck8": {
+          "meanHits": 2.42,
+          "meanPreviousOverlap": 2.96,
+          "totalHits": 242,
+          "hitRate": 0.242,
+          "deltaFromRandomExpectation": -0.08000000000000007
+        },
+        "luckydd": {
+          "meanHits": 2.37,
+          "meanPreviousOverlap": 2.7,
+          "totalHits": 237,
+          "hitRate": 0.23700000000000002,
+          "deltaFromRandomExpectation": -0.1299999999999999
+        },
+        "fusion": {
+          "meanHits": 2.51,
+          "meanPreviousOverlap": 3.5,
+          "totalHits": 251,
+          "hitRate": 0.251,
+          "deltaFromRandomExpectation": 0.009999999999999787
+        },
+        "random": {
+          "meanHits": 2.7,
+          "meanPreviousOverlap": 2.23,
+          "totalHits": 270,
+          "hitRate": 0.27,
+          "deltaFromRandomExpectation": 0.20000000000000018
+        }
+      }
+    }
+  },
+  "latestDrawWeight": {
+    "before": 0.15344929197033683,
+    "after": 0.002
+  },
+  "interpretation": "描述性回测，不是独立未见测试集；降低对上一期的偏重不等于提高预测能力。没有据此挑选或优化参数。选4时本例仍4个全部重合，如实保留。"
+}

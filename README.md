@@ -9,7 +9,7 @@
 - 下一期预测：首页直接生成目标期预测号码；默认先增量更新最近开奖，按最新库内期号推算目标期，保存完整预测，开奖导入后自动核对。可调整选号数量、历史窗口和目标期号。
 - 统一数据：SQLite、CSV/JSON导入导出、每期20个不重复号码校验、去重、冲突整批回滚、来源记录。
 - 在线同步：优先复用 gin-18 的汇鸟接口（自动分页），中彩网作为备用；增加超时、重试和数据校验，不可用时明确报错。
-- 融合分析：KittenCN 特征分数、Luck8 日期加权频率、LuckyDD 频率/关联特征，固定等权融合；gin-18 提供独立号码计数与规则计算。
+- 融合分析：KittenCN 特征分数、Luck8 窗口等权频率、LuckyDD 频率/关联特征，固定等权融合；gin-18 提供独立号码计数与规则计算。
 - 数据界面：最新开奖、历史记录、80号码频率/遗漏、区间/奇偶统计、各分支候选和随机对照。
 - 滚动回测：逐期只使用此前的历史窗口；输出平均命中数、逐期结果、均匀随机对照和理论基线。
 - 分析锁定：保存目标期号、截止期、输入数据指纹及各策略候选；导入对应开奖结果后自动复盘。
@@ -20,7 +20,7 @@
 | 上游 | 直接调用的模块 | 在融合版中的职责 |
 |---|---|---|
 | [KittenCN/kl8-lottery-analyzer](https://github.com/KittenCN/kl8-lottery-analyzer) | `compute_enhanced_scores` | 近期动量、共现谱与Dirichlet平滑特征 |
-| [fightingfor/Luck8](https://github.com/fightingfor/Luck8) | `KL8Predictor.analyze_frequency` | 按真实开奖日期加权的历史频率 |
+| [fightingfor/Luck8](https://github.com/fightingfor/Luck8) | `KL8Predictor.analyze_frequency` | 窗口内逐期等权的历史频率 |
 | [FanKang2021/LuckyDD](https://github.com/FanKang2021/LuckyDD) | `calculateHotColdNumbers`、`calculateMissingNumbers`、`findNumberCorrelations` 等 | 统计、遗漏、区间、奇偶及关联特征 |
 | [gin-18/lottery](https://github.com/gin-18/lottery) | `countNumberInData`、`combine`、`calculateRegularPrizeCounts` 等 | 号码计数、组合与规则计算 |
 
@@ -85,3 +85,11 @@ python -m unittest discover -s tests -v
 仅供个人非商业研究；保留所有上游归属和条款，不对四个项目统一改授许可证。LuckyDD 的 README 明确禁止商业用途。详见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
 
 本项目未证明任何策略能长期优于随机选号，也未验证盈利能力。
+
+## v0.3：上一期重号偏重修正
+
+Luck8 原来的 `1/(相隔天数+1)` 权重会过度放大最近一期。本适配层改为调用其 `analyze_frequency(weight_recent=False)`：所选窗口内每期权重相同，不人为排除任何上期号码。其余两个分支及固定三等权融合保持同一方法，没有根据测试期命中结果搜索参数。
+
+候选展示新增已知上期的开奖对照、逐组重合数和模型版本；回测同时展示与上一期平均重合数、对下一期实际平均命中数。两者含义不同。部分参数下候选仍可能全部来自上一期，不能把“减少重号”当作有效预测的证据。
+
+旧预测保存原号码和原模型版本，不会随新模型重新计算。修正前后对照记录见 `docs/recency-audit.json`。

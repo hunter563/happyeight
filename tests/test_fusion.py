@@ -47,6 +47,23 @@ class DataTests(unittest.TestCase):
         self.assertEqual(fingerprint([row]),fingerprint([{**row,'source':'different'}]))
 
 class EngineTests(unittest.TestCase):
+    def test_last_draw_does_not_outweigh_more_frequent_older_numbers(self):
+        draws=sample(120)
+        for i,d in enumerate(draws):
+            d['numbers']=list(range(1,21)) if i<12 else list(range(21,41))
+        draws[-1]['numbers']=list(range(61,81))
+        r=engine.analyze(draws,k=10,window=120)
+        scores={x['number']:x['luck8'] for x in r['numbers']}
+        self.assertGreater(scores[1],scores[80])
+        self.assertAlmostEqual(r['methods']['luck8LatestDrawWeight'],1/120)
+        self.assertEqual(r['previousDraw']['numbers'],draws[-1]['numbers'])
+
+    def test_previous_overlap_is_diagnostic_and_not_an_exclusion(self):
+        draws=[{**d,'numbers':list(range(1,21))} for d in sample(60)]
+        r=engine.analyze(draws,k=5,window=60)
+        self.assertEqual(len(r['overlapWithPrevious']['fusion']),5)
+        for name,values in r['selections'].items():
+            self.assertEqual(r['overlapWithPrevious'][name],sorted(set(values)&set(draws[-1]['numbers'])))
     def test_gin_counts_and_luckydd_missing_boundaries(self):
         draws=[{**d,'numbers':list(range(1,21))} for d in sample(30)]
         r=engine.node_call({'draws':draws})
@@ -72,6 +89,10 @@ class EngineTests(unittest.TestCase):
         after=engine.backtest(changed,k=5,window=60,folds=5)
         self.assertEqual([r['selections'] for r in before['records']],[r['selections'] for r in after['records']])
         for r in before['records']: self.assertLess(int(r['trainThrough']),int(r['issue']))
+        for r in before['records']:
+            previous=next(d for d in draws if d['issue']==r['trainThrough'])
+            for name,values in r['selections'].items():
+                self.assertEqual(r['previousOverlap'][name],len(set(values)&set(previous['numbers'])))
     def test_probabilities_normalized_and_mean(self):
         for k in range(1,11):
             p=engine.probabilities(k)

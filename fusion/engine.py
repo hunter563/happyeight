@@ -15,6 +15,8 @@ import pandas as pd
 
 from .data import ROOT, fingerprint
 
+MODEL_VERSION = '0.3.0'
+
 def load_module(name, path, package=False):
     spec = importlib.util.spec_from_file_location(name, path, submodule_search_locations=[str(path.parent)] if package else None)
     module = importlib.util.module_from_spec(spec)
@@ -70,10 +72,11 @@ def analyze(draws,k=10,window=120,seed=20261018,js=None):
     matrix=np.array([[int(d['issue']),*d['numbers']] for d in reversed(history)],dtype=int)
     enhanced,_=compute_enhanced_scores(matrix,len(matrix),use_pca=False)
     kitten=unit_scores(dict(enhanced))
-    # 使用上游真实加权频率函数，避开其旧奖金表和有目标泄露的期望值函数。
+    # 上游 1/(相隔天数+1) 会让最新一期压过大量旧样本。
+    # 使用上游提供的等权窗口频率，不因上期开过就额外抬高分数，也不排除重号。
     predictor=Luck8.__new__(Luck8)
     predictor.df=pd.DataFrame({'开奖日期':pd.to_datetime([d['date'] for d in history]),'numbers_list':[d['numbers'] for d in history]})
-    luck=unit_scores(predictor.analyze_frequency(weight_recent=True))
+    luck=unit_scores(predictor.analyze_frequency(weight_recent=False))
     frequency={x['number']:x['frequency'] for x in js['frequency']}
     pair={n:0.0 for n in range(1,81)}
     for x in js['correlations']:
@@ -85,10 +88,12 @@ def analyze(draws,k=10,window=120,seed=20261018,js=None):
     scores['fusion']={n:sum(s[n] for s in (kitten,luck,lucky))/3 for n in range(1,81)}
     selections={name:top(value,k,seed) for name,value in scores.items()}
     selections['random']=sorted(random.Random(seed).sample(range(1,81),k))
+    previous={key:history[-1][key] for key in ('issue','date','numbers')}
+    overlap={name:sorted(set(values)&set(previous['numbers'])) for name,values in selections.items()}
     missing={x['number']:x['missing'] for x in js['missing']}
     gin={int(x['num']):x['count'] for x in js['ginCounts']}
     numbers=[{'number':n,'count':gin[n],'frequency':frequency.get(n,0),'missing':missing[n],**{name:round(score[n],6) for name,score in scores.items()}} for n in range(1,81)]
-    return {'version':'0.1.0','asOfIssue':history[-1]['issue'],'asOfDate':history[-1]['date'],'window':len(history),'k':k,'seed':seed,'dataHash':fingerprint(history),'selections':selections,'numbers':numbers,'statistics':js,'weights':{'kitten':1/3,'luck8':1/3,'luckydd':1/3},'scoreMeaning':'0–1仅为归一化排序分数，不是中奖概率。四个项目中，gin-18提供统计/规则工具，三个分析分支参与固定等权融合。','disabled':['外部图嵌入缓存','PCA','LuckyDD随机置信分','Luck8原期望值/奖金推荐']}
+    return {'version':MODEL_VERSION,'asOfIssue':history[-1]['issue'],'asOfDate':history[-1]['date'],'window':len(history),'k':k,'seed':seed,'dataHash':fingerprint(history),'selections':selections,'numbers':numbers,'statistics':js,'weights':{'kitten':1/3,'luck8':1/3,'luckydd':1/3},'previousDraw':previous,'overlapWithPrevious':overlap,'methods':{'luck8':'equal-window-frequency','luck8LatestDrawWeight':1/len(history)},'scoreMeaning':'0–1仅为归一化排序分数，不是中奖概率。Luck8采用窗口内逐期等权频率；三个分支固定等权融合，允许号码与上一期重复。','disabled':['外部图嵌入缓存','PCA','LuckyDD随机置信分','Luck8原期望值/奖金推荐','Luck8倒数日期加权']}
 
 def backtest(draws,k=10,window=120,folds=30,seed=20261018):
     params(k,window)
@@ -106,11 +111,11 @@ def backtest(draws,k=10,window=120,folds=30,seed=20261018):
         actual=draws[i]
         if int(history[-1]['issue'])>=int(actual['issue']):
             raise ValueError('开奖期号顺序异常，无法执行时序回测')
-        records.append({'issue':actual['issue'],'trainThrough':history[-1]['issue'],'dataHash':result['dataHash'],'actual':actual['numbers'],'selections':result['selections'],'hits':{name:len(set(nums)&set(actual['numbers'])) for name,nums in result['selections'].items()}})
+        records.append({'issue':actual['issue'],'trainThrough':history[-1]['issue'],'dataHash':result['dataHash'],'actual':actual['numbers'],'selections':result['selections'],'previousOverlap':{name:len(values) for name,values in result['overlapWithPrevious'].items()},'hits':{name:len(set(nums)&set(actual['numbers'])) for name,nums in result['selections'].items()}})
     expected=k/4
     sd=math.sqrt(k*.25*.75*(80-k)/79/len(records))
-    summary={name:{'meanHits':mean(r['hits'][name] for r in records),'totalHits':sum(r['hits'][name] for r in records),'hitRate':mean(r['hits'][name] for r in records)/k,'deltaFromRandomExpectation':mean(r['hits'][name] for r in records)-expected} for name in records[0]['hits']}
-    return {'k':k,'window':window,'folds':len(records),'seed':seed,'theoreticalMeanHits':expected,'randomNull95Band':[max(0,expected-1.96*sd),min(k,expected+1.96*sd)],'summary':summary,'records':records,'note':'严格滚动：每期只用此前开奖；同样选号数量，对照均匀随机策略。区间为公平独立开奖假设下平均命中数的近似95%范围，不是模型胜率保证；未校正多重比较。'}
+    summary={name:{'meanHits':mean(r['hits'][name] for r in records),'meanPreviousOverlap':mean(r['previousOverlap'][name] for r in records),'totalHits':sum(r['hits'][name] for r in records),'hitRate':mean(r['hits'][name] for r in records)/k,'deltaFromRandomExpectation':mean(r['hits'][name] for r in records)-expected} for name in records[0]['hits']}
+    return {'version':MODEL_VERSION,'k':k,'window':window,'folds':len(records),'seed':seed,'theoreticalMeanHits':expected,'randomNull95Band':[max(0,expected-1.96*sd),min(k,expected+1.96*sd)],'summary':summary,'records':records,'note':'严格滚动：每期只用此前开奖；同样选号数量，对照均匀随机策略。与上一期重合数不是对下一期的命中数。区间为公平独立开奖假设下平均命中数的近似95%范围，不是模型胜率保证；未校正多重比较。'}
 
 def probabilities(k):
     params(k,30)

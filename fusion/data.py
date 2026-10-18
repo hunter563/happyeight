@@ -96,6 +96,9 @@ class Store:
             results=[]
             for row in conn.execute('SELECT * FROM experiments ORDER BY id DESC LIMIT 100'):
                 item=dict(row); item['payload']=json.loads(item['payload'])
+                # 仅补充展示用对照，不改写旧模型预测或已保存的 payload。
+                previous=draws.get(item['as_of_issue'])
+                item['previousDraw']={k:previous[k] for k in ('issue','date','numbers')} if previous else None
                 actual=draws.get(item['target_issue'])
                 item['actual']=actual
                 item['settled']=actual is not None
