@@ -77,7 +77,8 @@ def make_handler(store):
                 rows=parse_csv(body['csv']) if 'csv' in body else body['draws']
                 self.send(200,store.import_draws(rows,'用户导入'))
             elif route=='/api/sync':
-                self.send(200,store.import_draws(fetch_history(),'中彩网在线接口'))
+                fetched=fetch_history()
+                self.send(200,store.import_draws(fetched['draws'],fetched['source']))
             elif route=='/api/calculate':
                 self.send(200,{**node_call({'op':'calc',**{k:body[k] for k in ('k','selected','hits')}}),'probabilities':probabilities(body['k'])})
             elif route=='/api/experiments':

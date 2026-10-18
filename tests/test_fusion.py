@@ -1,4 +1,5 @@
 import copy
+import io
 import json
 import random
 import tempfile
@@ -14,6 +15,7 @@ from unittest.mock import patch
 from fusion import engine
 from fusion.data import Store,normalize,fingerprint,parse_csv
 from fusion.server import make_handler
+from fusion.provider import parse_gin,fetch_history,fetch_gin,FIELDS
 
 def sample(count=90):
     rng=random.Random(77)
@@ -82,6 +84,28 @@ class EngineTests(unittest.TestCase):
     def test_parameter_validation(self):
         for k,window in [(0,120),(11,120),(3,10),(3,501)]:
             with self.assertRaises(ValueError):engine.analyze(sample(),k,window)
+
+class ProviderTests(unittest.TestCase):
+    def test_gin_follows_actual_pagination(self):
+        pages=[]
+        for row in sample(2):
+            raw={'code':row['issue'],'day':row['date'],**dict(zip(FIELDS,map(str,row['numbers'])))}
+            stream=io.BytesIO(json.dumps({'code':1,'data':{'data':{'list':[raw],'totalPage':2}}}).encode())
+            stream.url='https://api.huiniao.top/interface/home/lotteryHistory'
+            pages.append(stream)
+        with patch('fusion.provider.urllib.request.urlopen',side_effect=pages) as request:
+            rows=fetch_gin();self.assertEqual(len(rows),2)
+            self.assertIn('page=2',request.call_args_list[1].args[0].full_url)
+    def test_gin_mapping(self):
+        row=sample(1)[0]
+        raw={'code':row['issue'],'day':row['date'],**dict(zip(FIELDS,map(str,row['numbers'])))}
+        self.assertEqual(parse_gin({'code':1,'data':{'data':{'list':[raw]}}}),[row])
+        with self.assertRaises(ValueError):parse_gin({'code':0,'data':{}})
+    def test_provider_fallback(self):
+        with patch('fusion.provider.fetch_gin',side_effect=RuntimeError('offline')):
+            with patch('fusion.provider.fetch_zhcw',return_value=sample(1)):
+                result=fetch_history();self.assertEqual(result['source'],'中彩网在线接口')
+                self.assertEqual(len(result['draws']),1)
 
 class ApiTests(unittest.TestCase):
     def setUp(self):

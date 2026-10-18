@@ -85,6 +85,10 @@ class Store:
             return
         rows = parse_csv((ROOT/'vendor/luck8/kl8_history.csv').read_text(encoding='utf-8-sig'))
         self.import_draws(rows,'fightingfor/Luck8 历史快照；未经逐期官方核验')
+        snapshot=ROOT/'samples/history-snapshot.json'
+        if snapshot.exists():
+            payload=json.loads(snapshot.read_text())
+            self.import_draws(payload['draws'],payload['source'])
 
     def experiments(self):
         with self.connect() as conn:
