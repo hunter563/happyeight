@@ -1,0 +1,121 @@
+{
+  "version": "geometry-0.1.0",
+  "k": 10,
+  "requestedFolds": 500,
+  "folds": 500,
+  "rules": {
+    "coordinateSystem": "横轴01–80；纵轴按开奖期顺序，每行一期；横纵每格等距。",
+    "maxSideComponent": 6,
+    "lookback": 12,
+    "knownVertices": 3,
+    "unknownVertices": 1,
+    "score": "每类匹配模板数 / 该号码可容纳的模板数，再对三类等权平均。分数不是概率。",
+    "scope": "仅检测下一行缺一个角的倾斜正方形、倾斜长方形和上下对称菱形；边向量分量固定1–6格。水平矩形有两个未知下角，不进入单点评分。",
+    "source": "布局参考图感觉公开走势图；几何模板、评分和回测由本项目独立实现，非对方预测算法。"
+  },
+  "summary": {
+    "geometry": {
+      "meanHits": 2.526,
+      "totalHits": 1263,
+      "deltaFromRandomExpectation": 0.0259999999999998,
+      "distribution": [
+        18,
+        97,
+        141,
+        131,
+        84,
+        20,
+        8,
+        1,
+        0,
+        0,
+        0
+      ]
+    },
+    "square": {
+      "meanHits": 2.51,
+      "totalHits": 1255,
+      "deltaFromRandomExpectation": 0.009999999999999787,
+      "distribution": [
+        17,
+        101,
+        143,
+        128,
+        78,
+        27,
+        5,
+        1,
+        0,
+        0,
+        0
+      ]
+    },
+    "rectangle": {
+      "meanHits": 2.488,
+      "totalHits": 1244,
+      "deltaFromRandomExpectation": -0.01200000000000001,
+      "distribution": [
+        25,
+        89,
+        142,
+        146,
+        68,
+        20,
+        9,
+        1,
+        0,
+        0,
+        0
+      ]
+    },
+    "diamond": {
+      "meanHits": 2.446,
+      "totalHits": 1223,
+      "deltaFromRandomExpectation": -0.053999999999999826,
+      "distribution": [
+        23,
+        101,
+        139,
+        135,
+        77,
+        19,
+        6,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "random": {
+      "meanHits": 2.506,
+      "totalHits": 1253,
+      "deltaFromRandomExpectation": 0.005999999999999783,
+      "distribution": [
+        24,
+        79,
+        162,
+        133,
+        69,
+        24,
+        8,
+        1,
+        0,
+        0,
+        0
+      ]
+    }
+  },
+  "skipped": [],
+  "theoreticalMeanHits": 2.5,
+  "randomNull95Band": [
+    2.3870185407839752,
+    2.6129814592160248
+  ],
+  "note": "历史探索性回测；规则固定，每期仅使用前12期，每策略同选取数量。缺期窗口明确跳过。95%范围基于公平独立开奖假设，未做多重比较校正；不能替代今后开奖前锁定的验证。",
+  "generatedAt": "2026-10-19T14:44:35.111619+00:00",
+  "datasetHash": "f6a0cd135ca4dd6d9b93410892228434676b6be02d6f5824868da1655b5862cb",
+  "firstTarget": "2025130",
+  "lastTarget": "2026278",
+  "checkedReferenceRows": 30,
+  "exploratoryOnly": true
+}

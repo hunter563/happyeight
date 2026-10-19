@@ -18,6 +18,7 @@ from .data import ROOT, Store, parse_csv, utc_now
 from .engine import analyze, backtest, node_call, probabilities, params
 from .provider import fetch_history, fetch_recent
 from .prediction import predict, prediction_context
+from .geometry import geometry_view, predict_geometry, backtest_geometry, validate_k
 
 def make_handler(store, access_username=None, access_password=None):
     username=access_username if access_username is not None else os.environ.get('KL8_ACCESS_USERNAME','happy8')
@@ -66,10 +67,12 @@ def make_handler(store, access_username=None, access_password=None):
                 self.send(200,analyze(store.draws(),int(q.get('k',[10])[0]),int(q.get('window',[120])[0])))
             elif url.path=='/api/experiments':
                 self.send(200,store.experiments())
+            elif url.path=='/api/geometry':
+                self.send(200,geometry_view(store.draws(),int(q.get('k',[10])[0]),int(q.get('rows',[30])[0]),q.get('asOfIssue',[None])[0]))
             elif url.path=='/api/export':
                 self.send(200,[{k:d[k] for k in ('issue','date','numbers')} for d in store.draws()])
             else:
-                name={'/':'index.html','/app.js':'app.js','/style.css':'style.css'}.get(url.path)
+                name={'/':'index.html','/app.js':'app.js','/geometry.js':'geometry.js','/style.css':'style.css'}.get(url.path)
                 if not name: return self.send(404,{'error':'页面不存在'})
                 path=ROOT/'web'/name
                 self.send(200,path.read_bytes(),(mimetypes.guess_type(name)[0] or 'text/plain')+'; charset=utf-8')
@@ -88,7 +91,27 @@ def make_handler(store, access_username=None, access_password=None):
             if not 0<size<=2_000_000: return self.send(413,{'error':'请求大小不合法（上限2MB）'})
             body=json.loads(self.rfile.read(size))
             route=urlsplit(self.path).path
-            if route=='/api/predict':
+            if route=='/api/geometry/predict':
+                k=body.get('k',10);rows=body.get('rows',30)
+                validate_k(k)
+                if type(rows) is not int or rows not in (30,50,100): raise ValueError('走势图可显示30、50或100期')
+                sync=body.get('sync',True)
+                if type(sync) is not bool: raise ValueError('sync 必须为布尔值')
+                sync_result={'status':'skipped'}
+                if sync:
+                    fetched=fetch_recent()
+                    sync_result={'status':'ok',**store.import_draws(fetched['draws'],fetched['source'])}
+                with store.connect() as conn:
+                    conn.execute('BEGIN IMMEDIATE')
+                    result=predict_geometry(store.draws(conn),k,rows,body.get('targetIssue'))
+                    result['sync']=sync_result
+                    cursor=conn.execute('INSERT INTO experiments(created_at,target_issue,as_of_issue,data_hash,payload) VALUES(?,?,?,?,?)',
+                        (result['generatedAt'],result['targetIssue'],result['asOfIssue'],result['dataHash'],json.dumps(result)))
+                    result['recordId']=cursor.lastrowid
+                self.send(201,result)
+            elif route=='/api/geometry/backtest':
+                self.send(200,backtest_geometry(store.draws(),body.get('k',10),body.get('folds',100)))
+            elif route=='/api/predict':
                 k=body.get('k',10);window=body.get('window',120)
                 params(k,window)
                 sync=body.get('sync',True)
