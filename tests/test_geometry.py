@@ -101,7 +101,7 @@ class GeometryTests(unittest.TestCase):
 
 
 class GeometryApiTests(unittest.TestCase):
-    def test_geometry_http_lock_settle_and_auth(self):
+    def test_geometry_http_disabled_without_writes_and_auth(self):
         with tempfile.TemporaryDirectory() as temp:
             store=Store(Path(temp)/'test.sqlite');rows=sample(50);store.import_draws(rows,'test')
             server=ThreadingHTTPServer(('127.0.0.1',0),make_handler(store))
@@ -111,17 +111,12 @@ class GeometryApiTests(unittest.TestCase):
                 req=urllib.request.Request(base+path,data=json.dumps(body).encode() if body is not None else None,headers={'Content-Type':'application/json'})
                 with urllib.request.urlopen(req) as response:return json.load(response)
             try:
-                view=request('/api/geometry?k=4&asOfIssue=2024040')
-                self.assertEqual(view['asOfIssue'],'2024040')
+                for path,body in [('/api/geometry?k=4&asOfIssue=2024040',None),('/api/geometry/predict',{'k':4,'sync':False}),('/api/geometry/backtest',{})]:
+                    with self.assertRaises(urllib.error.HTTPError) as cm:request(path,body)
+                    self.assertEqual(cm.exception.code,410)
                 self.assertEqual(store.experiments(),[])
-                with patch('fusion.geometry.prediction_context',return_value={'stale':False,'suggestedNextIssue':'2024051'}):
-                    locked=request('/api/geometry/predict',{'k':4,'sync':False})
-                original=store.experiments()[0]['payload']
-                self.assertEqual(original['selections'],locked['selections'])
-                store.import_draws([sample(51)[-1]],'test')
-                settled=request('/api/experiments')[0]
-                self.assertTrue(settled['settled']);self.assertEqual(settled['payload'],original)
-                self.assertIn('geometry',settled['hits'])
+                with self.assertRaises(urllib.error.HTTPError) as cm:request('/geometry.js')
+                self.assertEqual(cm.exception.code,404)
                 server.RequestHandlerClass=make_handler(store,'u','test-password-123456')
                 for path,body in [('/api/geometry',None),('/geometry.js',None),('/api/geometry/predict',{'sync':False}),('/api/geometry/backtest',{})]:
                     with self.assertRaises(urllib.error.HTTPError) as cm:request(path,body)

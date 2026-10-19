@@ -18,10 +18,14 @@ from fusion.data import Store,normalize,fingerprint,parse_csv
 from fusion.server import make_handler
 from fusion.provider import parse_gin,fetch_history,fetch_gin,FIELDS
 from fusion.prediction import predict,prediction_context
+from fusion.locked_model import KEY, VERSION
 
 def sample(count=90):
     rng=random.Random(77)
     return [{'issue':str(2024001+i),'date':(date(2024,1,1)+timedelta(days=i)).isoformat(),'numbers':sorted(rng.sample(range(1,81),20))} for i in range(count)]
+
+def recent_sample(count=90):
+    return [{**d,'issue':str(2026101+i),'date':(date(2026,4,1)+timedelta(days=i)).isoformat()} for i,d in enumerate(sample(count))]
 
 class DataTests(unittest.TestCase):
     def setUp(self):
@@ -140,15 +144,16 @@ class ProviderTests(unittest.TestCase):
 
 class PredictionTests(unittest.TestCase):
     def test_target_and_stale_data_guard(self):
-        draws=sample(90)
+        draws=recent_sample(90)
         day=date.fromisoformat(draws[-1]['date'])
-        r=predict(draws,k=5,window=60,today=day+timedelta(days=1))
-        self.assertEqual(r['targetIssue'],'2024091')
+        r=predict(draws,today=day+timedelta(days=1))
+        self.assertEqual(r['targetIssue'],'2026191')
         self.assertTrue(r['targetInferred'])
-        self.assertEqual(len(r['selections']['fusion']),5)
+        self.assertEqual(list(r['selections']),[KEY])
+        self.assertIn(len(r['selections'][KEY]),range(10,15))
         with self.assertRaisesRegex(ValueError,'不能确定实时下一期'):
             predict(draws,today=day+timedelta(days=4))
-        old=predict(draws,target_issue='2024091',today=day+timedelta(days=4))
+        old=predict(draws,target_issue='2026191',today=day+timedelta(days=4))
         self.assertTrue(old['freshness']['stale']);self.assertFalse(old['targetInferred'])
         with self.assertRaisesRegex(ValueError,'晚于'):
             predict(draws,target_issue=draws[-1]['issue'],today=day)
@@ -163,7 +168,7 @@ class PredictionTests(unittest.TestCase):
 class ApiTests(unittest.TestCase):
     def setUp(self):
         self.temp=tempfile.TemporaryDirectory();self.store=Store(Path(self.temp.name)/'api.sqlite')
-        self.store.import_draws(sample(150),'test')
+        self.store.import_draws(recent_sample(150),'test')
         self.server=ThreadingHTTPServer(('127.0.0.1',0),make_handler(self.store))
         self.thread=threading.Thread(target=self.server.serve_forever,daemon=True);self.thread.start()
         self.base=f'http://127.0.0.1:{self.server.server_port}'
@@ -188,45 +193,70 @@ class ApiTests(unittest.TestCase):
         req=urllib.request.Request(self.base+'/api/status',headers={'Authorization':'Basic '+token})
         with urllib.request.urlopen(req) as response:self.assertEqual(json.loads(response.read())['count'],150)
         status,payload=self.request('/api/health')
-        self.assertEqual((status,payload),(200,{'ok':True}))
+        self.assertEqual((status,payload),(200,{'ok':True,'activeRule':VERSION}))
 
     def test_status_and_analysis(self):
         _,r=self.request('/api/status');self.assertEqual(r['count'],150)
-        _,r=self.request('/api/analysis?k=3&window=60');self.assertEqual(len(r['selections']['fusion']),3)
+        self.assertEqual(r['engines'],[KEY]);self.assertEqual(r['activeRule']['id'],VERSION)
+        _,r=self.request('/api/analysis');self.assertEqual(list(r['selections']),[KEY])
+        self.assertIn(r['k'],range(10,15))
+        with self.assertRaises(urllib.error.HTTPError) as cm:self.request('/api/analysis?k=3&window=60')
+        self.assertEqual(cm.exception.code,400)
     def test_lock_and_settle(self):
-        status,r=self.request('/api/experiments',{'targetIssue':'2024151','k':5,'window':60})
+        status,r=self.request('/api/experiments',{'targetIssue':'2026251'})
         self.assertEqual(status,201)
         snapshot=self.store.experiments()[0]['data_hash']
-        self.store.import_draws([sample(151)[-1]],'test')
+        self.store.import_draws([recent_sample(151)[-1]],'test')
         result=self.store.experiments()[0]
         self.assertTrue(result['settled']);self.assertEqual(result['data_hash'],snapshot)
-        self.assertEqual(len(result['hits']),5)
+        self.assertEqual(list(result['hits']),[KEY])
     def test_predict_sync_target_save_and_settle(self):
-        incoming=sample(151)[-1]
+        incoming=recent_sample(151)[-1]
         with patch('fusion.server.fetch_recent',return_value={'draws':[incoming],'source':'test-online'}):
-            with patch('fusion.prediction.prediction_context',side_effect=lambda draws,today=None:prediction_context(draws,today=date(2024,5,30))):
-                status,r=self.request('/api/predict',{'k':5,'window':60})
+            with patch('fusion.prediction.prediction_context',side_effect=lambda draws,today=None:prediction_context(draws,today=date.fromisoformat(incoming['date']))):
+                status,r=self.request('/api/predict',{})
         self.assertEqual(status,201)
-        self.assertEqual(r['targetIssue'],'2024152')
-        self.assertEqual(r['asOfIssue'],'2024151')
+        self.assertEqual(r['targetIssue'],'2026252')
+        self.assertEqual(r['asOfIssue'],'2026251')
         self.assertEqual(r['sync']['inserted'],1)
         saved=self.store.experiments()[0]
         self.assertEqual(saved['id'],r['recordId'])
         self.assertEqual(saved['payload']['selections'],r['selections'])
         self.assertEqual(saved['data_hash'],r['dataHash'])
-        actual=sample(152)[-1];self.store.import_draws([actual],'test')
+        actual=recent_sample(152)[-1];self.store.import_draws([actual],'test')
         settled=self.store.experiments()[0]
         self.assertTrue(settled['settled'])
-        self.assertEqual(settled['hits']['fusion'],len(set(actual['numbers'])&set(r['selections']['fusion'])))
+        self.assertEqual(settled['hits'][KEY],len(set(actual['numbers'])&set(r['selections'][KEY])))
 
     def test_predict_offline_fresh_data_warns_and_invalid_params_skip_network(self):
         with patch('fusion.server.fetch_recent',side_effect=RuntimeError('offline')) as source:
-            with patch('fusion.prediction.prediction_context',side_effect=lambda draws,today=None:prediction_context(draws,today=date(2024,5,29))):
-                status,r=self.request('/api/predict',{'k':3,'window':60})
+            with patch('fusion.prediction.prediction_context',side_effect=lambda draws,today=None:prediction_context(draws,today=date.fromisoformat(recent_sample(150)[-1]['date']))):
+                status,r=self.request('/api/predict',{})
             self.assertEqual(status,201);self.assertEqual(r['sync']['status'],'error')
             self.assertEqual(source.call_count,1)
             with self.assertRaises(urllib.error.HTTPError) as cm:self.request('/api/predict',{'k':11})
             self.assertEqual(cm.exception.code,400);self.assertEqual(source.call_count,1)
+    def test_archived_records_are_preserved_and_not_default(self):
+        original={'version':'old-version','selections':{'fusion':[1,2,3]}}
+        with self.store.connect() as conn:
+            conn.execute('INSERT INTO experiments(created_at,target_issue,as_of_issue,data_hash,payload) VALUES(?,?,?,?,?)',
+                         ('2026-01-01T00:00:00Z','2026251','2026250','old-hash',json.dumps(original)))
+        _,active=self.request('/api/experiments');self.assertEqual(active,[])
+        self.request('/api/experiments',{'targetIssue':'2026251'})
+        _,active=self.request('/api/experiments');self.assertEqual(len(active),1)
+        self.assertEqual(active[0]['payload']['version'],VERSION)
+        _,all_rows=self.request('/api/experiments?includeArchived=1')
+        archived=[r for r in all_rows if r['archived']]
+        self.assertEqual(len(archived),1);self.assertEqual(archived[0]['payload'],original)
+
+    def test_model_switch_and_manual_count_rejected_without_network(self):
+        with patch('fusion.server.fetch_recent') as source:
+            for route in ['/api/predict','/api/experiments','/api/backtest']:
+                for options in [{'k':10},{'window':12},{'model':'fusion'},{'strategy':'geometry'}]:
+                    with self.assertRaises(urllib.error.HTTPError) as cm:self.request(route,options)
+                    self.assertEqual(cm.exception.code,400)
+            source.assert_not_called()
+        self.assertEqual(self.store.experiments(),[])
     def test_past_target_and_cross_origin_rejected(self):
         for body,origin,code in [({'targetIssue':'2024001'},None,400),({},'https://unrelated.example',403)]:
             with self.assertRaises(urllib.error.HTTPError) as cm:self.request('/api/experiments',body,origin)

@@ -4,7 +4,7 @@ from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
 from .data import utc_now
-from .engine import analyze
+from .locked_model import analyze, validate_options, adjacent
 
 
 def prediction_context(draws, today=None):
@@ -20,7 +20,8 @@ def prediction_context(draws, today=None):
             'ageDays':age,'stale':age>1,'asOfIssue':latest['issue'],'asOfDate':latest['date']}
 
 
-def predict(draws,k=10,window=120,target_issue=None,today=None):
+def predict(draws,k=None,window=None,target_issue=None,today=None):
+    validate_options(k,window)
     context=prediction_context(draws,today)
     target=str(target_issue or '').strip()
     inferred=not target
@@ -32,8 +33,10 @@ def predict(draws,k=10,window=120,target_issue=None,today=None):
         if not target: raise ValueError('跨年期号无法自动确认，请核对后填写目标期号')
     if not re.fullmatch(r'20\d{5}',target) or target<=max(d['issue'] for d in draws):
         raise ValueError('预测目标期号必须晚于所有已知开奖期号')
-    result=analyze(draws,k,window)
+    if not adjacent(draws[-1]['issue'],target):
+        raise ValueError('固定规则只生成紧邻的下一期，请补齐中间开奖数据')
+    result=analyze(draws)
     return {**result,'kind':'next-period-prediction','targetIssue':target,'targetInferred':inferred,
             'generatedAt':utc_now(),'freshness':context,
             'targetNote':'按最新已知期号顺延推算，未核验官方开奖日历。' if inferred else '使用你填写的目标期号。',
-            'notice':'模型候选用于验证，不代表已知开奖结果或中奖保证；当前没有证据证明融合策略稳定优于随机选号。'}
+            'notice':'当前仅启用已固定的评分筛选规则；候选和评分不代表中奖保证。'}

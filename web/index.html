@@ -1,35 +1,31 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>快乐8 · 融合研究台</title><link rel="stylesheet" href="/style.css"></head>
+<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>快乐8 · 固定规则研究台</title><link rel="stylesheet" href="/style.css"></head>
 <body>
-<header><a class="brand" href="/">K<span>8</span><small>融合研究台</small></a><span class="badge">PERSONAL RESEARCH · 个人非商业研究</span></header>
+<header><a class="brand" href="/">K<span>8</span><small>固定规则研究台</small></a><span class="badge">PERSONAL RESEARCH · 个人研究</span></header>
 <main>
-<div class="intro"><div><div class="eyebrow">PREDICT. SAVE. VERIFY.</div><h1>下一期，先预测再验证。</h1><p>生成目标期预测号码 · 自动保存 · 开奖后核对</p></div><button id="sync" class="primary">同步在线开奖 <span>↻</span></button></div>
+<div class="intro"><div><div class="eyebrow">ONE RULE. SAVE. VERIFY.</div><h1>一条规则，持续核对。</h1><p>上上期±1生成20个候选 · 固定评分筛选 · 开奖后复盘</p></div><button id="sync" class="primary">同步在线开奖 ↻</button></div>
 <div id="message" role="status" aria-live="polite"></div>
 <div class="metrics" id="metrics"></div>
-<nav aria-label="主导航"><button class="active" data-tab="prediction">下一期预测</button><button data-tab="geometry">走势图 · 图形补点</button><button data-tab="overview">数据总览</button><button data-tab="analysis">融合分析</button><button data-tab="backtest">回测实验</button><button data-tab="calculator">规则计算器</button><button data-tab="records">锁定与复盘</button></nav>
+<nav aria-label="主导航"><button class="active" data-tab="prediction">下一期预测</button><button data-tab="backtest">规则回测</button><button data-tab="overview">开奖数据</button><button data-tab="records">预测与复盘</button></nav>
 <section id="prediction" class="panel active"><article class="prediction-box">
-<div class="section-head"><div><div class="eyebrow">NEXT DRAW</div><h2>生成下一期预测号码</h2><p id="prediction-context" class="muted">正在读取最新已知期号…</p></div><span class="prediction-label">三个分析分支 · 固定等权融合</span></div>
-<div class="controls prediction-controls"><label>选取数量<select id="predict-k"></select></label><label>历史窗口<select id="predict-window"><option>60</option><option selected>120</option><option>240</option><option>500</option></select></label><label>目标期号（留空自动推算）<input id="predict-issue" inputmode="numeric" maxlength="7" placeholder="自动推算下一期"></label><button id="run-predict" class="primary">生成下一期预测</button></div>
+<div class="section-head"><div><div class="eyebrow">NEXT DRAW</div><h2>生成下一期候选</h2><p id="prediction-context" class="muted">正在读取最新已知期号…</p></div><span class="prediction-label">固定评分筛选 · 10–14个</span></div>
+<div class="controls prediction-controls"><label>目标期号（留空自动推算）<input id="predict-issue" inputmode="numeric" maxlength="7" placeholder="自动推算下一期"></label><button id="run-predict" class="primary">生成并保存预测</button></div>
 <label class="check-label"><input id="predict-sync" type="checkbox" checked>预测前更新最近开奖数据</label>
-<p class="muted">生成后自动保存到「锁定与复盘」。导入或同步目标期开奖结果后，可查看各策略实际命中数。</p>
+<p class="muted">采用《杀号优化_100期复核》主方案，模型和数量策略已经固定。该表100期均保留14个、累计命中374个。</p>
 <div id="prediction-progress" role="status" aria-live="polite"></div>
-<div id="prediction-result" class="empty">点击「生成下一期预测」，显示目标期号、融合号码和各分支结果。</div>
-<div class="note">这是基于历史数据生成的模型候选，不是已知开奖结果；目前未证明能稳定优于随机选号。期号自动顺延仅为推算，跨年或数据过旧时需要核对。</div>
+<div id="prediction-result" class="empty">生成后显示最终号码、原20个候选和删除号码，并自动保存。</div>
+<details><summary>查看固定规则</summary><p>目标为第N期：用N−2期开奖号码分别加1、减1，去重并删除越界值。双来源优先，同分沿用固定顺序，取20个候选。</p><p>根据此前12期的次数、遗漏、图形及规则支持计算固定模型评分。按评分从高到低，累计评分目标4，至少保留10个、最多14个；这个评分目标不代表会中4个。</p><p>不重新训练、不自动切换其他策略。历史回测仍有低命中期，不能保证下一期表现。</p></details>
 </article></section>
-<section id="geometry" class="panel"><article>
-<div class="section-head"><div><div class="eyebrow">GEOMETRY LAB / 01</div><h2>看走势，查看每个候选的图形依据</h2><p class="muted">01–80横向排列，每行一期。蓝线连接已知角点，橙色虚线连接下一期待补点。</p></div><span class="prediction-label">独立实验 · 尚未证明预测有效</span></div>
-<div class="controls geometry-controls"><label>选取数量<select id="geo-k"></select></label><label>显示期数<select id="geo-rows"><option>30</option><option>50</option><option>100</option></select></label><label>历史回放截止期（留空看最新）<input id="geo-asof" placeholder="例如 2026277" maxlength="7" inputmode="numeric"></label><button id="geo-load" class="primary">查看走势与图形</button><button id="geo-save">更新开奖并锁定下一期</button></div>
-<label class="check-label"><input id="geo-missing" type="checkbox" checked>显示遗漏数字</label>
-<div id="geo-status" role="status" aria-live="polite" class="muted">正在加载走势图…</div>
-<div id="geo-result"></div>
-<details class="geometry-rules"><summary>图形规则与计算范围</summary><p>本版扫描倾斜正方形、倾斜长方形、上下对称菱形：三个角必须属于历史开奖，第四个角只能位于紧邻的下一期。横纵每格等距，边向量横纵分量固定为1–6格，最多使用此前12期。</p><p>水平矩形的两个下角均属于未来，不能拿其中一个当已知开奖号，因此不进入本版的单点评分。每类按匹配数除以可容纳模板数评分，三类等权；分数不是中奖概率。参考站提供走势图与手动画线工具，本项目自行实现固定识别规则。</p></details>
-</article><article><div class="section-head"><div><h2>图形方法有没有用？用全部结果核对</h2><p class="muted">每次遮住目标期开奖，只看之前12期。历史回放仅用于核对，不代表曾提前预测。</p></div><div class="controls"><label>回测期数<select id="geo-folds"><option>30</option><option selected>100</option><option>500</option></select></label><button id="geo-test" class="primary">检验图形规则</button></div></div><div id="geo-test-result" class="empty">同样数量下，比较三类图形、等权图形评分与随机对照。</div></article></section>
+<section id="backtest" class="panel"><article>
+<div class="section-head"><div><h2>同一规则，逐期复核</h2><p class="muted">只复核模型训练截止2026178之后；每期选号仅读取该期之前的数据。</p></div><div class="controls"><label>测试期数<select id="test-folds"><option>30</option><option selected>100</option><option>300</option></select></label><button id="run-test" class="primary">开始回测</button></div></div>
+<div id="test-result" class="empty">查看每期选了几个、中了几个、误删了哪些号码。</div>
+</article></section>
 <section id="overview" class="panel">
-<div class="two-col"><article><div class="section-head"><h2>最新一期开奖结果</h2><span id="draw-label"></span></div><div id="latest-balls" class="balls"></div><p class="muted" id="source-note"></p><div class="section-head"><h2>四项目接入</h2><span>实际函数调用</span></div><div class="engines"><div><b>01 / KittenCN</b><p>近期动量、共现谱、平滑特征</p></div><div><b>02 / Luck8</b><p>窗口内逐期等权的历史频率</p></div><div><b>03 / LuckyDD</b><p>冷热统计、区间与号码关联</p></div><div><b>04 / 快乐8研究所</b><p>号码计数、组合与奖金规则</p></div></div></article><article><h2>数据工作区</h2><p>内置历史快照帮助你立即运行。日期与来源始终显示；在线同步失败时保留已有数据。</p><label class="file-button">导入 CSV / JSON<input id="import-file" type="file" accept=".csv,.json"></label><a class="button secondary" href="/api/export" download="kl8-history.json">导出统一数据</a><p class="muted">CSV列：issue,date,numbers；也支持“期号,开奖日期,开奖号码”。每期20个号码，期号冲突时整批取消。</p><div class="note">融合评分是排序指标，不代表中奖概率。默认固定等权，结果可在回测中与随机选号比较。</div></article></div>
-<article><div class="section-head"><h2>近期开奖记录</h2><span>按开奖日期倒序</span></div><div class="table-scroll"><table><thead><tr><th>期号</th><th>日期</th><th>开奖号码</th></tr></thead><tbody id="history"></tbody></table></div></article></section>
-<section id="analysis" class="panel"><article><div class="section-head"><div><h2>多策略融合</h2><p class="muted">在相同数据窗口内比较三个分析分支，并加入随机对照。</p></div><div class="controls"><label>选取数量<select id="analysis-k"></select></label><label>历史窗口<select id="analysis-window"><option>60</option><option selected>120</option><option>240</option><option>500</option></select></label><button id="run-analysis" class="primary">运行分析</button></div></div><div id="analysis-result" class="empty">点击运行分析，查看候选组合与80个号码的统计。</div></article></section>
-<section id="backtest" class="panel"><article><div class="section-head"><div><h2>严格滚动回测</h2><p class="muted">预测第 N 期只使用 N 期之前的数据，每个策略使用相同数量号码。</p></div><div class="controls"><label>选取数量<select id="test-k"></select></label><label>窗口<select id="test-window"><option>60</option><option selected>120</option><option>240</option></select></label><label>测试期数<select id="test-folds"><option>10</option><option selected>30</option><option>100</option></select></label><button id="run-test" class="primary">开始回测</button></div></div><div id="test-result" class="empty">回测将显示平均命中数、随机理论基线和逐期结果。</div></article></section>
-<section id="calculator" class="panel"><article><div class="section-head"><div><h2>组合与规则计算器</h2><p class="muted">调用快乐8研究所组合函数。奖金规则来自上游快照，未核验当前官方版本。</p></div><div class="controls"><label>玩法<select id="calc-k"></select></label><label>选中号码数<input id="calc-selected" type="number" min="1" max="80" value="10"></label><label>其中命中数<input id="calc-hits" type="number" min="0" max="20" value="3"></label><button id="run-calc" class="primary">计算</button></div></div><div id="calc-result" class="empty">查看组合数量、参考固定奖金与单注理论命中分布。</div></article></section>
-<section id="records" class="panel"><article><div class="section-head"><div><h2>开奖前锁定，开奖后复盘</h2><p class="muted">保存数据截止期、数据指纹与各策略候选。记录创建后不可在界面中修改。</p></div><div class="controls"><label>目标期号<input id="target-issue" placeholder="填写尚未开奖的期号" maxlength="7"></label><label>选取数量<select id="lock-k"></select></label><button id="lock" class="primary">运行并锁定</button></div></div><div id="records-result" class="empty">尚无锁定记录</div></article></section>
-<footer><span>KL8 FUSION <b>v0.4</b> · 个人研究试用</span><span>数据可核验，分数不等于概率。</span></footer>
-</main><script type="module" src="/app.js"></script><script type="module" src="/geometry.js"></script></body></html>
+<div class="two-col"><article><div class="section-head"><h2>最新一期开奖结果</h2><span id="draw-label"></span></div><div id="latest-balls"></div><p class="muted" id="source-note"></p></article>
+<article><h2>开奖数据工作区</h2><p>导入与同步保留来源。重复数据自动跳过，期号冲突时整批取消。</p><label class="file-button">导入 CSV / JSON<input id="import-file" type="file" accept=".csv,.json"></label><a class="button secondary" href="/api/export" download="kl8-history.json">导出数据</a><p class="muted">CSV列：issue,date,numbers；每期20个不重复号码。</p></article></div>
+<article><h2>近期开奖记录</h2><div class="table-scroll"><table><thead><tr><th>期号</th><th>日期</th><th>开奖号码</th></tr></thead><tbody id="history"></tbody></table></div></article>
+</section>
+<section id="records" class="panel"><article><div class="section-head"><div><h2>固定规则预测与复盘</h2><p class="muted">开奖结果同步后自动核对；已经保存的号码不会重新计算。</p></div><button id="reload-records">刷新记录</button></div><div id="records-result" class="empty">正在读取预测记录…</div>
+<details><summary>旧版本归档记录</summary><p class="muted">以前的结果保留供核查，不再参与新预测。</p><button id="load-archive">查看旧记录</button><div id="archive-result"></div></details></article></section>
+</main><footer>快乐8个人研究 · 固定规则与数据版本一起保存 · 不保证命中</footer>
+<script src="/app.js"></script></body></html>

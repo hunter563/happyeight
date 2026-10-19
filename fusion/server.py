@@ -5,7 +5,6 @@ import hmac
 import json
 import mimetypes
 import os
-import re
 import traceback
 import webbrowser
 from datetime import datetime
@@ -14,11 +13,11 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 from zoneinfo import ZoneInfo
 
-from .data import ROOT, Store, parse_csv, utc_now
-from .engine import analyze, backtest, node_call, probabilities, params
+from .data import ROOT, Store, parse_csv
+from .engine import node_call, probabilities
+from .locked_model import analyze, backtest, metadata, validate_options, VERSION, KEY
 from .provider import fetch_history, fetch_recent
 from .prediction import predict, prediction_context
-from .geometry import geometry_view, predict_geometry, backtest_geometry, validate_k
 
 def make_handler(store, access_username=None, access_password=None):
     username=access_username if access_username is not None else os.environ.get('KL8_ACCESS_USERNAME','happy8')
@@ -53,7 +52,7 @@ def make_handler(store, access_username=None, access_password=None):
 
         def do_GET(self):
             if urlsplit(self.path).path=='/api/health':
-                return self.send(200,{'ok':True})
+                return self.send(200,{'ok':True,'activeRule':VERSION})
             if self.authorized(): self.guarded(self.get)
 
         def get(self):
@@ -62,17 +61,21 @@ def make_handler(store, access_username=None, access_password=None):
                 draws=store.draws();latest=draws[-1] if draws else None
                 today=datetime.now(ZoneInfo('Asia/Shanghai')).date()
                 age=(today-datetime.fromisoformat(latest['date']).date()).days if latest else None
-                self.send(200,{'count':len(draws),'first':draws[0] if draws else None,'latest':latest,'ageDays':age,'recent':draws[-20:][::-1],'sources':json.loads((ROOT/'UPSTREAM_SOURCES.json').read_text()),'engines':['kitten','luck8','luckydd','gin-18'],'nonCommercial':True,'prediction':prediction_context(draws)})
+                self.send(200,{'count':len(draws),'first':draws[0] if draws else None,'latest':latest,'ageDays':age,'recent':draws[-20:][::-1],'sources':json.loads((ROOT/'UPSTREAM_SOURCES.json').read_text()),'engines':[KEY],'activeRule':metadata(),'nonCommercial':True,'prediction':prediction_context(draws)})
             elif url.path=='/api/analysis':
-                self.send(200,analyze(store.draws(),int(q.get('k',[10])[0]),int(q.get('window',[120])[0])))
+                validate_options(q.get('k'),q.get('window'))
+                if 'strategy' in q or 'model' in q: raise ValueError('后台仅有一个固定模型')
+                self.send(200,analyze(store.draws()))
             elif url.path=='/api/experiments':
-                self.send(200,store.experiments())
+                rows=store.experiments()
+                for item in rows:item['archived']=item['payload'].get('version')!=VERSION
+                self.send(200,rows if q.get('includeArchived')==['1'] else [r for r in rows if not r['archived']])
             elif url.path=='/api/geometry':
-                self.send(200,geometry_view(store.draws(),int(q.get('k',[10])[0]),int(q.get('rows',[30])[0]),q.get('asOfIssue',[None])[0]))
+                self.send(410,{'error':'独立图形预测已停用，后台仅保留固定评分筛选规则','activeRule':VERSION})
             elif url.path=='/api/export':
                 self.send(200,[{k:d[k] for k in ('issue','date','numbers')} for d in store.draws()])
             else:
-                name={'/':'index.html','/app.js':'app.js','/geometry.js':'geometry.js','/style.css':'style.css'}.get(url.path)
+                name={'/':'index.html','/app.js':'app.js','/style.css':'style.css'}.get(url.path)
                 if not name: return self.send(404,{'error':'页面不存在'})
                 path=ROOT/'web'/name
                 self.send(200,path.read_bytes(),(mimetypes.guess_type(name)[0] or 'text/plain')+'; charset=utf-8')
@@ -91,30 +94,13 @@ def make_handler(store, access_username=None, access_password=None):
             if not 0<size<=2_000_000: return self.send(413,{'error':'请求大小不合法（上限2MB）'})
             body=json.loads(self.rfile.read(size))
             route=urlsplit(self.path).path
-            if route=='/api/geometry/predict':
-                k=body.get('k',10);rows=body.get('rows',30)
-                validate_k(k)
-                if type(rows) is not int or rows not in (30,50,100): raise ValueError('走势图可显示30、50或100期')
-                sync=body.get('sync',True)
-                if type(sync) is not bool: raise ValueError('sync 必须为布尔值')
-                sync_result={'status':'skipped'}
-                if sync:
-                    fetched=fetch_recent()
-                    sync_result={'status':'ok',**store.import_draws(fetched['draws'],fetched['source'])}
-                with store.connect() as conn:
-                    conn.execute('BEGIN IMMEDIATE')
-                    result=predict_geometry(store.draws(conn),k,rows,body.get('targetIssue'))
-                    result['sync']=sync_result
-                    cursor=conn.execute('INSERT INTO experiments(created_at,target_issue,as_of_issue,data_hash,payload) VALUES(?,?,?,?,?)',
-                        (result['generatedAt'],result['targetIssue'],result['asOfIssue'],result['dataHash'],json.dumps(result)))
-                    result['recordId']=cursor.lastrowid
-                self.send(201,result)
-            elif route=='/api/geometry/backtest':
-                self.send(200,backtest_geometry(store.draws(),body.get('k',10),body.get('folds',100)))
-            elif route=='/api/predict':
-                k=body.get('k',10);window=body.get('window',120)
-                params(k,window)
-                sync=body.get('sync',True)
+            if route in ('/api/geometry/predict','/api/geometry/backtest'):
+                return self.send(410,{'error':'独立图形预测已停用，后台仅保留固定评分筛选规则','activeRule':VERSION})
+            elif route in ('/api/predict','/api/experiments'):
+                validate_options(body.get('k'),body.get('window'))
+                if 'strategy' in body or 'model' in body:
+                    raise ValueError('后台仅有一个固定模型，不支持切换预测策略')
+                sync=body.get('sync',route=='/api/predict')
                 if type(sync) is not bool: raise ValueError('sync 必须为布尔值')
                 sync_result={'status':'skipped'}
                 if sync:
@@ -125,14 +111,17 @@ def make_handler(store, access_username=None, access_password=None):
                         sync_result={'status':'error','message':'在线更新失败，使用库内数据。'+str(exc)}
                 with store.connect() as conn:
                     conn.execute('BEGIN IMMEDIATE')
-                    result=predict(store.draws(conn),k,window,body.get('targetIssue'))
+                    result=predict(store.draws(conn),target_issue=body.get('targetIssue'))
                     result['sync']=sync_result
                     cursor=conn.execute('INSERT INTO experiments(created_at,target_issue,as_of_issue,data_hash,payload) VALUES(?,?,?,?,?)',
                         (result['generatedAt'],result['targetIssue'],result['asOfIssue'],result['dataHash'],json.dumps(result)))
                     result['recordId']=cursor.lastrowid
+                    result['id']=cursor.lastrowid
                 self.send(201,result)
             elif route=='/api/backtest':
-                self.send(200,backtest(store.draws(),body.get('k',10),body.get('window',120),body.get('folds',30),body.get('seed',20261018)))
+                validate_options(body.get('k'),body.get('window'))
+                if 'strategy' in body or 'model' in body: raise ValueError('后台仅有一个固定模型')
+                self.send(200,backtest(store.draws(),body.get('folds',100)))
             elif route=='/api/import':
                 rows=parse_csv(body['csv']) if 'csv' in body else body['draws']
                 self.send(200,store.import_draws(rows,'用户导入'))
@@ -141,17 +130,6 @@ def make_handler(store, access_username=None, access_password=None):
                 self.send(200,store.import_draws(fetched['draws'],fetched['source']))
             elif route=='/api/calculate':
                 self.send(200,{**node_call({'op':'calc',**{k:body[k] for k in ('k','selected','hits')}}),'probabilities':probabilities(body['k'])})
-            elif route=='/api/experiments':
-                target=str(body.get('targetIssue',''))
-                with store.connect() as conn:
-                    conn.execute('BEGIN IMMEDIATE')
-                    draws=store.draws(conn)
-                    if not re.fullmatch(r'20\d{5}',target) or not draws or target<=max(d['issue'] for d in draws):
-                        raise ValueError('锁定期号必须晚于当前所有已知开奖期号')
-                    result=analyze(draws,body.get('k',10),body.get('window',120),body.get('seed',20261018))
-                    cursor=conn.execute('INSERT INTO experiments(created_at,target_issue,as_of_issue,data_hash,payload) VALUES(?,?,?,?,?)',(utc_now(),target,result['asOfIssue'],result['dataHash'],json.dumps(result)))
-                    item={'id':cursor.lastrowid,'targetIssue':target,'asOfIssue':result['asOfIssue']}
-                self.send(201,item)
             else: self.send(404,{'error':'接口不存在'})
     return Handler
 
