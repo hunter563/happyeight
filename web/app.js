@@ -44,6 +44,9 @@ $('load-archive').onclick=()=>busy('load-archive',async()=>{$('archive-result').
 refresh().catch(e=>message(e.message,true));
 
 let cachedCharts=null;
+$('charts-position').innerHTML=Array.from({length:20},(_,i)=>`<option value="${i}">第${i+1}位</option>`).join('');
+function renderPositions(){if(!cachedCharts)return;const idx=Number($('charts-position').value);$('charts-positions').innerHTML=cachedCharts.rows.slice().reverse().map(r=>{const p=r.positions[idx];return `<tr><td>${esc(r.issue)}</td><td>${p.number}</td><td>${p.tail}</td><td>${p.mod3}</td><td>${p.prime?'质':'合'}</td><td>${p.direction==='up'?'升':p.direction==='down'?'降':p.direction==='flat'?'平':'—'}</td><td>${p.amplitude??'—'}</td></tr>`}).join('');}
+$('charts-position').onchange=renderPositions;
 function renderChartGrid(){
  if(!cachedCharts)return;
  const mode=$('charts-grid').value,rows=cachedCharts.nineSquareLayouts[mode]||[];
@@ -60,6 +63,7 @@ async function loadCharts(){
  $('charts-history').innerHTML=rows.map(r=>`<tr><td>${esc(r.issue)}</td><td>${r.sum}</td><td>${r.span}</td><td>${r.odd}</td><td>${r.even}</td><td>${r.large}</td><td>${r.small}</td><td>${r.repeatFromPrevious??'—'}</td></tr>`).join('');
  $('charts-frequencies').innerHTML=Array.from({length:80},(_,i)=>i+1).map(n=>`<div class="number-cell"><strong>${String(n).padStart(2,'0')}</strong><small>出现 ${data.frequency.frequency[n]} · 遗漏 ${data.frequency.omission[n]}</small></div>`).join('');
  renderChartGrid();
+ renderPositions();
 }
 $('charts-load').onclick=()=>busy('charts-load',loadCharts);
 $('charts-limit').onchange=()=>loadCharts().catch(e=>message(e.message,true));
