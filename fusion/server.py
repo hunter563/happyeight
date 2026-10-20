@@ -18,6 +18,7 @@ from .engine import node_call, probabilities
 from .locked_model import analyze, backtest, metadata, validate_options, VERSION, KEY
 from .provider import fetch_history, fetch_recent
 from .chart_series import chart_series
+from .ninesquare_layouts import LAYOUTS
 from .prediction import predict, prediction_context
 
 def make_handler(store, access_username=None, access_password=None):
@@ -66,7 +67,7 @@ def make_handler(store, access_username=None, access_password=None):
             elif url.path=='/api/chart-series':
                 requested=q.get('limit',['50'])
                 if len(requested)!=1: raise ValueError('limit only once')
-                self.send(200,chart_series(store.draws(),int(requested[0])))
+                self.send(200,{**chart_series(store.draws(),int(requested[0])), 'nineSquareLayouts':LAYOUTS})
             elif url.path=='/api/analysis':
                 validate_options(q.get('k'),q.get('window'))
                 if 'strategy' in q or 'model' in q: raise ValueError('后台仅有一个固定模型')
