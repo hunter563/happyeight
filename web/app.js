@@ -199,6 +199,7 @@ $('charts-range-to').oninput=renderTrendLine;
 $('charts-line-reset').onclick=()=>{$('charts-range-from').value=0;$('charts-range-to').value=100;renderTrendLine()};
 
 const chartCatalog={
+ ranking:[...['frequency','omission'].flatMap(mode=>[4,5,8,10].map(k=>({id:mode+'_'+k,title:(mode==='frequency'?'冷热':'遗漏')+'排序'+k+'分区'})))],
  position:Array.from({length:20},(_,i)=>({id:String(i),title:'第'+(i+1)+'位号码走势'})),
  special:[['element','五行'],['color','波色'],['sum81','和81码分区'],['has_digit','包含数字0—9'],['double','对子号'],['reverse','对望码'],['neither','非对非望']].map(([id,title])=>({id,title})),
  residue:Array.from({length:18},(_,i)=>({id:String(i+3),title:(i+3)+'余数分布'})),
@@ -208,16 +209,26 @@ const chartCatalog={
 let chartFamilyInstance=null;
 function chartFamilySelection(){
  const family=$('charts-family').value;
+ $('charts-ranked-window-label').hidden=family!=='ranking';
  $('charts-family-item').innerHTML=chartCatalog[family].map(x=>'<option value="'+esc(x.id)+'">'+esc(x.title)+'</option>').join('');
  renderChartFamily();
 }
-function renderChartFamily(){
+async function renderChartFamily(){
  if(!cachedCharts)return;
  const holder=$('charts-family-view'),desc=$('charts-family-description');
  const family=$('charts-family').value,id=$('charts-family-item').value;
  if(!id)return;
- const rows=cachedCharts.rows;
+ let rows=cachedCharts.rows;
  let groups=[],series=[],legend=[];
+ if(family==='ranking'){
+  const [mode,partitions]=id.split('_');
+  desc.textContent='根据每个目标期开奖前的历史记录排名，避免将目标开奖结果用于排序；统计分区为独立实现。';
+  try{
+   const ranked=await api('/api/ranked-series?mode='+mode+'&groups='+partitions+'&lookback='+$('charts-ranked-window').value+'&limit='+$('charts-limit').value);
+   if($('charts-family').value!==family||$('charts-family-item').value!==id)return;
+   rows=ranked.rows;
+   series=Array.from({length:Number(partitions)},(_,i)=>({name:'第'+(i+1)+'组',type:'line',showSymbol:false,data:rows.map(row=>row.counts?.[i]??null)}));
+  }catch(e){desc.textContent='排序图读取失败：'+e.message;return;}
  if(family==='position'){
    const idx=Number(id);
    series=[{name:'第'+(idx+1)+'位',type:'line',data:rows.map(r=>r.positions[idx].number),smooth:false,showSymbol:false}];
@@ -260,4 +271,5 @@ function renderChartFamily(){
 }
 $('charts-family').onchange=chartFamilySelection;
 $('charts-family-item').onchange=renderChartFamily;
+$('charts-ranked-window').onchange=renderChartFamily;
 window.addEventListener('resize',()=>chartFamilyInstance?.resize());
