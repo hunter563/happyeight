@@ -18,3 +18,13 @@ jobs:
       - run: node --check web/app.js
       - run: node --check web/geometry.js
       - run: python -m unittest discover -s tests -v
+
+  docker-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build production image with vendored ECharts
+        run: docker build -t happyeight:ci .
+      - name: Verify bundle, static page wiring and Python imports
+        run: |
+          docker run --rm --entrypoint python happyeight:ci -c "from pathlib import Path; from fusion.chart_ranked import ranking_series; from fusion.chart_series import chart_series; p=Path('/app/web/vendor/echarts.min.js'); assert p.is_file() and p.stat().st_size>100000; assert '/vendor/echarts.min.js' in Path('/app/web/index.html').read_text()"
