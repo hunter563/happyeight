@@ -1,6 +1,7 @@
 """Read-only chart series: independent reconstruction of publicly described indicators."""
 from .chart_indicators import validate, profile, history_stats, group_counts, residue_groups, range_groups
 from .chart_trends import category_trend, draw_streaks
+from .chart_special import special_profile, special_groups
 
 def is_prime(n):
     if n == 1:
@@ -80,6 +81,7 @@ def chart_series(draw_records, limit=50):
             "positionAmplitude":p.get("position_amplitude"),
             "consecutivePairs":p["consecutive_pairs"],
             "positions":position_profile(nums,previous),
+            "special":special_profile(nums),
         })
         previous=nums
     trend = category_trend([r['numbers'] for r in rows])
@@ -93,5 +95,6 @@ def chart_series(draw_records, limit=50):
         "frequency": history_stats([r["numbers"] for r in rows]),
         "omissionSummary": omission_summary([r["numbers"] for r in rows]),
         "streakSummary": draw_streaks([r["numbers"] for r in rows]),
+        "specialGroupDefinitions": special_groups(),
         "omissionMethod": "Window-only: completed gaps exclude leading/trailing censored observations; insufficient history is null.",
     }
