@@ -18,3 +18,11 @@
 .nine-cell{background:#f2f3ed;border:1px solid var(--line);border-radius:4px;aspect-ratio:1;display:flex;align-items:center;justify-content:center;font:600 15px monospace}
 .nine-cell.drawn{background:var(--accent);border-color:var(--accent);color:white}
 @media(max-width:700px){#charts .number-grid{grid-template-columns:repeat(5,minmax(0,1fr))}.nine-square{gap:2px}.nine-cell{font-size:11px;min-width:0}}
+
+/* Dynamic historical trend chart; no remote runtime dependency */
+.charts-line{width:100%;overflow:hidden;background:linear-gradient(180deg,#fffefa,#fbfcf9);border:1px solid var(--line);border-radius:7px;margin:12px 0 8px}
+.charts-line svg{display:block;width:100%;height:auto;min-height:230px;touch-action:pan-y}
+#charts-line-tooltip{min-height:30px;padding:5px 0;color:var(--green);font-size:13px;font-weight:600}
+#charts-range-from,#charts-range-to{width:210px;max-width:38vw;accent-color:var(--accent)}
+#charts-line-reset{align-self:flex-end}
+@media(max-width:650px){.charts-line svg{min-height:175px}#charts-range-from,#charts-range-to{max-width:43vw}}
