@@ -200,6 +200,7 @@ $('charts-line-reset').onclick=()=>{$('charts-range-from').value=0;$('charts-ran
 
 const chartCatalog={
  position:Array.from({length:20},(_,i)=>({id:String(i),title:'第'+(i+1)+'位号码走势'})),
+ special:[['element','五行'],['color','波色'],['sum81','和81码分区'],['has_digit','包含数字0—9'],['double','对子号'],['reverse','对望码'],['neither','非对非望']].map(([id,title])=>({id,title})),
  residue:Array.from({length:18},(_,i)=>({id:String(i+3),title:(i+3)+'余数分布'})),
  range:Array.from({length:10},(_,i)=>({id:String(i+3),title:(i+3)+'等宽区间分布'})),
  scalar:[['sum','和值'],['sumTail','和值尾数'],['span','跨度'],['spanTail','跨度尾数'],['mean','平均值'],['max','最大号'],['min','最小号'],['odd','奇数个数'],['even','偶数个数'],['prime','质数个数'],['composite','合数个数'],['small','小号个数'],['large','大号个数'],['sumSpanSumTail','和跨和尾'],['sumSpanDiffTail','和跨差尾'],['consecutivePairs','连号对数']].map(([id,title])=>({id,title}))
@@ -221,6 +222,11 @@ function renderChartFamily(){
    const idx=Number(id);
    series=[{name:'第'+(idx+1)+'位',type:'line',data:rows.map(r=>r.positions[idx].number),smooth:false,showSymbol:false}];
    desc.textContent='依据升序排列的第'+(idx+1)+'个开奖号，纵轴显示实际号码，支持悬停与缩放。';
+ }else if(family==='special'){
+   const prefixes={element:['element_'],color:['color_'],sum81:['sum81_'],has_digit:['has_digit_']};
+   const selected=(prefixes[id]?Object.keys(rows[0]?.special||{}).filter(k=>prefixes[id].some(p=>k.startsWith(p))):[id]);
+   series=selected.map(k=>({name:k.replace('element_','五行 ').replace('color_','波色 ').replace('sum81_','和81组 ').replace('has_digit_','含数字 '),type:'line',showSymbol:false,data:rows.map(r=>r.special?.[k]??null)}));
+   desc.textContent='公开数学分类的独立统计实现：'+(chartCatalog.special.find(x=>x.id===id)?.title||id)+'。特殊分类可能有交叉，请勿将各组数量简单相加。';
  }else if(family==='scalar'){
    const name=chartCatalog.scalar.find(x=>x.id===id)?.title||id;
    series=[{name,type:'line',data:rows.map(r=>r[id]??null),smooth:false,showSymbol:false}];
