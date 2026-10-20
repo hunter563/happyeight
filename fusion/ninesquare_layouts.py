@@ -87,10 +87,41 @@ for key, rows in LAYOUTS.items():
     assert sorted(n for row in rows for n in row if n is not None) == list(range(1,81)), key
     assert sum(n is None for row in rows for n in row) == 1, key
 
+
+# Odd/even rotating charts contain 40 numbered cells each, with intentional blanks.
+# Publicly displayed row order, not a forecast model.
+EVEN_ROTATION = [
+[None,2,None,4,None,6,None,8,None],
+[32,None,34,None,36,None,38,None,10],
+[None,56,None,58,None,60,None,40,None],
+[30,None,72,None,74,None,62,None,12],
+[None,54,None,80,None,76,None,42,None],
+[28,None,70,None,78,None,64,None,14],
+[None,52,None,68,None,66,None,44,None],
+[26,None,50,None,48,None,46,None,16],
+[None,24,None,22,None,20,None,18,None],
+]
+ODD_ROTATION = [
+[1,None,3,None,5,None,7,None,9],
+[None,33,None,35,None,37,None,39,None],
+[31,None,57,None,59,None,61,None,11],
+[None,55,None,73,None,75,None,41,None],
+[29,None,71,None,None,None,63,None,13],
+[None,53,None,79,None,77,None,43,None],
+[27,None,69,None,67,None,65,None,15],
+[None,51,None,49,None,47,None,45,None],
+[25,None,23,None,21,None,19,None,17],
+]
+HALF_LAYOUTS = {"even_rotation": EVEN_ROTATION, "odd_rotation": ODD_ROTATION}
+for key, rows in HALF_LAYOUTS.items():
+    assert len(rows)==9 and all(len(row)==9 for row in rows), key
+    expected = list(range(2,81,2)) if key=="even_rotation" else list(range(1,80,2))
+    assert sorted(n for row in rows for n in row if n is not None)==expected, key
+
 def grid(name):
-    if name not in LAYOUTS:
+    if name not in LAYOUTS and name not in HALF_LAYOUTS:
         raise ValueError("Unknown verified nine-square layout")
-    rows = LAYOUTS[name]
+    rows = LAYOUTS[name] if name in LAYOUTS else HALF_LAYOUTS[name]
     return [row[:] for row in rows]
 
 def grid_hits(name, numbers):
