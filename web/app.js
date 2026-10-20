@@ -64,7 +64,44 @@ async function loadCharts(){
  $('charts-frequencies').innerHTML=Array.from({length:80},(_,i)=>i+1).map(n=>`<div class="number-cell"><strong>${String(n).padStart(2,'0')}</strong><small>出现 ${data.frequency.frequency[n]} · 遗漏 ${data.frequency.omission[n]} · 连出 ${data.streakSummary[n].currentRun}</small></div>`).join('');
  renderChartGrid();
  renderPositions();
+ renderTrendLine();
 }
 $('charts-load').onclick=()=>busy('charts-load',loadCharts);
 $('charts-limit').onchange=()=>loadCharts().catch(e=>message(e.message,true));
 $('charts-grid').onchange=renderChartGrid;
+
+const chartLabel={sum:'和值',span:'跨度',odd:'奇数个数',repeatFromPrevious:'重号个数',consecutivePairs:'连号对数'};
+function renderTrendLine(){
+ if(!cachedCharts)return;
+ const metricName=$('charts-line-metric').value;
+ const all=cachedCharts.rows;
+ const fromPercent=Number($('charts-range-from').value);
+ const toPercent=Number($('charts-range-to').value);
+ const from=Math.floor((all.length-1)*Math.min(fromPercent,toPercent)/100);
+ const to=Math.ceil((all.length-1)*Math.max(fromPercent,toPercent)/100);
+ const shown=all.slice(from,to+1);
+ const values=shown.map(r=>r[metricName]);
+ const finite=values.filter(n=>typeof n==='number'&&Number.isFinite(n));
+ const div=$('charts-line'),tooltip=$('charts-line-tooltip');
+ if(!finite.length){div.textContent='该范围暂无有效数据';tooltip.textContent='';return;}
+ const W=1000,H=305,L=55,R=22,T=24,B=52,inner=W-L-R,height=H-T-B;
+ const lo=Math.min(...finite),hi=Math.max(...finite);
+ const delta=Math.max(1,hi-lo),bottom=lo-delta*.1,top=hi+delta*.1;
+ const x=i=>L+(shown.length===1?inner/2:i*inner/(shown.length-1));
+ const y=v=>T+(top-v)/(top-bottom)*height;
+ let runs=[],run=[];
+ shown.forEach((row,i)=>{const val=row[metricName];if(typeof val==='number'&&Number.isFinite(val))run.push([i,val]);else if(run.length){runs.push(run);run=[];}});
+ if(run.length)runs.push(run);
+ const polylines=runs.map(part=>'<polyline points="'+part.map(([i,v])=>x(i).toFixed(2)+','+y(v).toFixed(2)).join(' ')+'" fill="none" stroke="#d6542c" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>').join('');
+ const ticks=Array.from({length:5},(_,i)=>{const val=bottom+(top-bottom)*i/4;const yy=y(val);return '<line x1="'+L+'" y1="'+yy+'" x2="'+(W-R)+'" y2="'+yy+'" stroke="#e6e8e3"/><text x="'+(L-8)+'" y="'+(yy+4)+'" text-anchor="end" fill="#65747a" font-size="12">'+val.toFixed(1)+'</text>'}).join('');
+ const points=$('charts-line-points').checked?shown.map((row,i)=>typeof row[metricName]==='number'?'<circle cx="'+x(i)+'" cy="'+y(row[metricName])+'" r="3.6" fill="#d6542c"/>':'').join(''):'';
+ div.innerHTML='<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="xMidYMid meet" aria-label="'+chartLabel[metricName]+'历史折线">'+ticks+polylines+points+'<line x1="'+L+'" y1="'+(H-B)+'" x2="'+(W-R)+'" y2="'+(H-B)+'" stroke="#89959b"/><text x="'+L+'" y="'+(H-18)+'" font-size="12">'+esc(shown[0]?.issue||'')+'</text><text x="'+(W-R)+'" y="'+(H-18)+'" text-anchor="end" font-size="12">'+esc(shown.at(-1)?.issue||'')+'</text><line id="chart-crosshair" x1="'+L+'" y1="'+T+'" x2="'+L+'" y2="'+(H-B)+'" stroke="#376b75" stroke-dasharray="4 4" visibility="hidden"/><rect x="'+L+'" y="'+T+'" width="'+inner+'" height="'+height+'" fill="transparent" id="chart-hotzone"/></svg>';
+ const zone=div.querySelector('#chart-hotzone'),cross=div.querySelector('#chart-crosshair');
+ zone.addEventListener('pointermove',event=>{const svg=zone.ownerSVGElement,box=svg.getBoundingClientRect();const xpos=(event.clientX-box.left)*W/box.width;const i=shown.length===1?0:Math.max(0,Math.min(shown.length-1,Math.round((xpos-L)*(shown.length-1)/inner)));const row=shown[i];cross.setAttribute('x1',x(i));cross.setAttribute('x2',x(i));cross.setAttribute('visibility','visible');tooltip.textContent='第 '+row.issue+' 期 · '+chartLabel[metricName]+'：'+(row[metricName]??'无数据')});
+ zone.addEventListener('pointerleave',()=>{cross.setAttribute('visibility','hidden');tooltip.textContent='';});
+}
+$('charts-line-metric').onchange=renderTrendLine;
+$('charts-line-points').onchange=renderTrendLine;
+$('charts-range-from').oninput=renderTrendLine;
+$('charts-range-to').oninput=renderTrendLine;
+$('charts-line-reset').onclick=()=>{$('charts-range-from').value=0;$('charts-range-to').value=100;renderTrendLine()};
