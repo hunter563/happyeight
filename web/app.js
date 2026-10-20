@@ -44,6 +44,53 @@ $('load-archive').onclick=()=>busy('load-archive',async()=>{$('archive-result').
 refresh().catch(e=>message(e.message,true));
 
 let cachedCharts=null;
+let chartReplayTimer=null, chartReplayIndex=null, heatmapInstance=null;
+$('charts-track-number').innerHTML='<option value="0">全部号码</option>'+Array.from({length:80},(_,i)=>'<option value="'+(i+1)+'">'+String(i+1).padStart(2,'0')+'号</option>').join('');
+function stopChartReplay(){
+ if(chartReplayTimer!==null){clearInterval(chartReplayTimer);chartReplayTimer=null;}
+ $('charts-replay-toggle').textContent='▶ 历史回放';
+}
+function renderHeatmap(){
+ if(!cachedCharts)return;
+ const rows=cachedCharts.rows, end=chartReplayIndex===null?rows.length-1:chartReplayIndex;
+ const selected=Number($('charts-track-number').value);
+ const div=$('charts-heatmap');
+ if(!globalThis.echarts){div.textContent='热力图需要加载 ECharts，请确认网络或部署资源。';return;}
+ if(!heatmapInstance)heatmapInstance=echarts.init(div,null,{renderer:'canvas'});
+ const shown=rows.slice(0,end+1),data=[];
+ shown.forEach((r,i)=>{const found=new Set(r.numbers);for(let n=1;n<=80;n++){const hit=found.has(n);data.push([n-1,i,hit?(selected&&selected!==n?2:1):0]);}});
+ heatmapInstance.setOption({
+  animation:shown.length<=50,
+  grid:{left:72,right:28,top:30,bottom:52},
+  tooltip:{position:'top',formatter:({data:d})=>{const row=shown[d[1]];return '第 '+esc(row.issue)+' 期 · '+(d[0]+1)+'号：'+(d[2]===0?'未出现': '出现');}},
+  xAxis:{type:'category',data:Array.from({length:80},(_,i)=>String(i+1).padStart(2,'0')),axisLabel:{interval:7},splitArea:{show:false}},
+  yAxis:{type:'category',data:shown.map(r=>r.issue),axisLabel:{hideOverlap:true}},
+  visualMap:{show:false,type:'piecewise',pieces:[{value:0,color:'#f1f3ee'},{value:1,color:'#d6542c'},{value:2,color:'#d1d7d4'}]},
+  dataZoom:[{type:'inside',xAxisIndex:0,start:0,end:100},{type:'inside',yAxisIndex:0,start:Math.max(0,100-45/Math.max(1,shown.length)*100),end:100}],
+  series:[{type:'heatmap',data,progressive:4000,emphasis:{itemStyle:{borderColor:'#184758',borderWidth:1}}}]
+ },true);
+ heatmapInstance.resize();
+ const status=$('charts-replay-status');
+ status.textContent='展示至第 '+(rows[end]?.issue||'—')+' 期；红色为当期出现，灰色为其他已出现号码。';
+ if(rows[end]){const appeared=new Set(rows[end].numbers);$('charts-square').querySelectorAll('.nine-cell').forEach(e=>{const n=Number(e.textContent);e.classList.toggle('drawn',n>0&&appeared.has(n));});}
+}
+$('charts-track-number').onchange=renderHeatmap;
+$('charts-replay-toggle').onclick=()=>{
+ if(!cachedCharts)return;
+ if(chartReplayTimer!==null){stopChartReplay();return;}
+ const rows=cachedCharts.rows;if(!rows.length)return;
+ if(chartReplayIndex===null||chartReplayIndex>=rows.length-1)chartReplayIndex=0;
+ $('charts-replay-toggle').textContent='Ⅱ 暂停';
+ chartReplayTimer=setInterval(()=>{
+  if(chartReplayIndex>=rows.length-1){stopChartReplay();return;}
+  chartReplayIndex++;renderHeatmap();
+ },Number($('charts-replay-speed').value));
+ renderHeatmap();
+};
+$('charts-replay-reset').onclick=()=>{stopChartReplay();chartReplayIndex=null;renderHeatmap()};
+$('charts-replay-speed').onchange=()=>{if(chartReplayTimer!==null){stopChartReplay();$('charts-replay-toggle').click();}};
+window.addEventListener('resize',()=>heatmapInstance?.resize());
+
 $('charts-position').innerHTML=Array.from({length:20},(_,i)=>`<option value="${i}">第${i+1}位</option>`).join('');
 function renderPositions(){if(!cachedCharts)return;const idx=Number($('charts-position').value);$('charts-positions').innerHTML=cachedCharts.rows.slice().reverse().map(r=>{const p=r.positions[idx];return `<tr><td>${esc(r.issue)}</td><td>${p.number}</td><td>${p.tail}</td><td>${p.mod3}</td><td>${p.prime?'质':'合'}</td><td>${p.direction==='up'?'升':p.direction==='down'?'降':p.direction==='flat'?'平':'—'}</td><td>${p.amplitude??'—'}</td></tr>`}).join('');}
 $('charts-position').onchange=renderPositions;
@@ -56,6 +103,7 @@ function renderChartGrid(){
 async function loadCharts(){
  $('charts-status').textContent='正在读取历史统计…';
  const data=await api('/api/chart-series?limit='+encodeURIComponent($('charts-limit').value));
+ stopChartReplay();chartReplayIndex=null;
  cachedCharts=data;
  const rows=data.rows.slice().reverse();
  $('charts-status').textContent=`已载入${data.count}期历史数据。指标仅用于描述历史，不提供预测保证。`;
@@ -65,6 +113,7 @@ async function loadCharts(){
  renderChartGrid();
  renderPositions();
  renderTrendLine();
+ renderHeatmap();
 }
 $('charts-load').onclick=()=>busy('charts-load',loadCharts);
 $('charts-limit').onchange=()=>loadCharts().catch(e=>message(e.message,true));
