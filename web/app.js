@@ -71,8 +71,50 @@ $('charts-limit').onchange=()=>loadCharts().catch(e=>message(e.message,true));
 $('charts-grid').onchange=renderChartGrid;
 
 const chartLabel={sum:'和值',span:'跨度',odd:'奇数个数',repeatFromPrevious:'重号个数',consecutivePairs:'连号对数'};
+let echartsTrendInstance=null;
+function renderEchartsTrendLine(){
+ if(!cachedCharts || !globalThis.echarts)return false;
+ const chartEl=$('charts-line'),tooltip=$('charts-line-tooltip');
+ if(!echartsTrendInstance)echartsTrendInstance=echarts.init(chartEl,null,{renderer:'canvas'});
+ const key=$('charts-line-metric').value;
+ const rows=cachedCharts.rows;
+ const left=Math.min(Number($('charts-range-from').value),Number($('charts-range-to').value));
+ const right=Math.max(Number($('charts-range-from').value),Number($('charts-range-to').value));
+ const lo=Math.floor((rows.length-1)*left/100);
+ const hi=Math.ceil((rows.length-1)*right/100);
+ const visible=rows.slice(lo,hi+1);
+ const values=visible.map(r=>Number.isFinite(r[key])?r[key]:null);
+ echartsTrendInstance.setOption({
+  animation:true,animationDuration:480,animationDurationUpdate:260,
+  backgroundColor:'transparent',
+  grid:{left:55,right:28,top:24,bottom:55},
+  tooltip:{trigger:'axis',axisPointer:{type:'cross',snap:true},
+   formatter:items=>{const d=visible[items?.[0]?.dataIndex];return d?'第 '+esc(d.issue)+' 期<br/>'+esc(chartLabel[key])+'：'+(d[key]??'暂无'):''}},
+  toolbox:{right:6,top:0,feature:{saveAsImage:{title:'保存走势图',pixelRatio:2},restore:{title:'恢复缩放'}}},
+  xAxis:{type:'category',boundaryGap:false,data:visible.map(r=>r.issue),axisLabel:{hideOverlap:true},axisLine:{lineStyle:{color:'#aeb6b3'}}},
+  yAxis:{type:'value',scale:true,splitLine:{lineStyle:{color:'#e4e8e5'}}},
+  dataZoom:[{type:'inside',start:0,end:100,zoomOnMouseWheel:true,moveOnMouseMove:false},
+            {type:'slider',start:0,end:100,bottom:3,height:20}],
+  series:[{name:chartLabel[key],type:'line',data:values,connectNulls:false,
+           smooth:false,symbol:'circle',symbolSize:6,
+           showSymbol:$('charts-line-points').checked,
+           lineStyle:{width:2.5,color:'#d6542c'},
+           itemStyle:{color:'#d6542c'},areaStyle:{opacity:.045,color:'#d6542c'}}]
+ },true);
+ echartsTrendInstance.off('updateAxisPointer');
+ echartsTrendInstance.on('updateAxisPointer',e=>{
+  const index=e.axesInfo?.[0]?.value;
+  const row=Number.isInteger(index)?visible[index]:null;
+  tooltip.textContent=row?'第 '+row.issue+' 期 · '+chartLabel[key]+'：'+(row[key]??'无数据'):'';
+ });
+ echartsTrendInstance.resize();
+ return true;
+}
+window.addEventListener('resize',()=>echartsTrendInstance?.resize());
 function renderTrendLine(){
  if(!cachedCharts)return;
+ if(renderEchartsTrendLine())return;
+ if(echartsTrendInstance){echartsTrendInstance.dispose();echartsTrendInstance=null;}
  const metricName=$('charts-line-metric').value;
  const all=cachedCharts.rows;
  const fromPercent=Number($('charts-range-from').value);
