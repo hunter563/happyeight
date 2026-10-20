@@ -17,6 +17,7 @@ from .data import ROOT, Store, parse_csv
 from .engine import node_call, probabilities
 from .locked_model import analyze, backtest, metadata, validate_options, VERSION, KEY
 from .provider import fetch_history, fetch_recent
+from .chart_series import chart_series
 from .prediction import predict, prediction_context
 
 def make_handler(store, access_username=None, access_password=None):
@@ -62,6 +63,10 @@ def make_handler(store, access_username=None, access_password=None):
                 today=datetime.now(ZoneInfo('Asia/Shanghai')).date()
                 age=(today-datetime.fromisoformat(latest['date']).date()).days if latest else None
                 self.send(200,{'count':len(draws),'first':draws[0] if draws else None,'latest':latest,'ageDays':age,'recent':draws[-20:][::-1],'sources':json.loads((ROOT/'UPSTREAM_SOURCES.json').read_text()),'engines':[KEY],'activeRule':metadata(),'nonCommercial':True,'prediction':prediction_context(draws)})
+            elif url.path=='/api/chart-series':
+                requested=q.get('limit',['50'])
+                if len(requested)!=1: raise ValueError('limit only once')
+                self.send(200,chart_series(store.draws(),int(requested[0])))
             elif url.path=='/api/analysis':
                 validate_options(q.get('k'),q.get('window'))
                 if 'strategy' in q or 'model' in q: raise ValueError('后台仅有一个固定模型')
