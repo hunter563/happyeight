@@ -229,7 +229,7 @@ async function renderChartFamily(){
    rows=ranked.rows;
    series=Array.from({length:Number(partitions)},(_,i)=>({name:'第'+(i+1)+'组',type:'line',showSymbol:false,data:rows.map(row=>row.counts?.[i]??null)}));
   }catch(e){desc.textContent='排序图读取失败：'+e.message;return;}
- if(family==='position'){
+ }else if(family==='position'){
    const idx=Number(id);
    series=[{name:'第'+(idx+1)+'位',type:'line',data:rows.map(r=>r.positions[idx].number),smooth:false,showSymbol:false}];
    desc.textContent='依据升序排列的第'+(idx+1)+'个开奖号，纵轴显示实际号码，支持悬停与缩放。';
