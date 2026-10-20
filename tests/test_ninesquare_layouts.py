@@ -3,7 +3,7 @@ from fusion.ninesquare_layouts import grid, grid_hits
 
 class NineSquareTests(unittest.TestCase):
     def test_verified_layouts(self):
-        for mode in ("standard", "symmetric"):
+        for mode in ("standard", "symmetric", "loosened", "wound", "zigzag", "folded"):
             rows=grid(mode)
             self.assertEqual((len(rows),len(rows[0])),(9,9))
             vals=[n for row in rows for n in row if n is not None]
