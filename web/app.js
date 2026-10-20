@@ -86,6 +86,7 @@ $('charts-replay-toggle').onclick=()=>{
   chartReplayIndex++;renderHeatmap();
  },Number($('charts-replay-speed').value));
  renderHeatmap();
+ chartFamilySelection();
 };
 $('charts-replay-reset').onclick=()=>{stopChartReplay();chartReplayIndex=null;renderHeatmap()};
 $('charts-replay-speed').onchange=()=>{if(chartReplayTimer!==null){stopChartReplay();$('charts-replay-toggle').click();}};
@@ -196,3 +197,61 @@ $('charts-line-points').onchange=renderTrendLine;
 $('charts-range-from').oninput=renderTrendLine;
 $('charts-range-to').oninput=renderTrendLine;
 $('charts-line-reset').onclick=()=>{$('charts-range-from').value=0;$('charts-range-to').value=100;renderTrendLine()};
+
+const chartCatalog={
+ position:Array.from({length:20},(_,i)=>({id:String(i),title:'第'+(i+1)+'位号码走势'})),
+ residue:Array.from({length:18},(_,i)=>({id:String(i+3),title:(i+3)+'余数分布'})),
+ range:Array.from({length:10},(_,i)=>({id:String(i+3),title:(i+3)+'等宽区间分布'})),
+ scalar:[['sum','和值'],['sumTail','和值尾数'],['span','跨度'],['spanTail','跨度尾数'],['mean','平均值'],['max','最大号'],['min','最小号'],['odd','奇数个数'],['even','偶数个数'],['prime','质数个数'],['composite','合数个数'],['small','小号个数'],['large','大号个数'],['sumSpanSumTail','和跨和尾'],['sumSpanDiffTail','和跨差尾'],['consecutivePairs','连号对数']].map(([id,title])=>({id,title}))
+};
+let chartFamilyInstance=null;
+function chartFamilySelection(){
+ const family=$('charts-family').value;
+ $('charts-family-item').innerHTML=chartCatalog[family].map(x=>'<option value="'+esc(x.id)+'">'+esc(x.title)+'</option>').join('');
+ renderChartFamily();
+}
+function renderChartFamily(){
+ if(!cachedCharts)return;
+ const holder=$('charts-family-view'),desc=$('charts-family-description');
+ const family=$('charts-family').value,id=$('charts-family-item').value;
+ if(!id)return;
+ const rows=cachedCharts.rows;
+ let groups=[],series=[],legend=[];
+ if(family==='position'){
+   const idx=Number(id);
+   series=[{name:'第'+(idx+1)+'位',type:'line',data:rows.map(r=>r.positions[idx].number),smooth:false,showSymbol:false}];
+   desc.textContent='依据升序排列的第'+(idx+1)+'个开奖号，纵轴显示实际号码，支持悬停与缩放。';
+ }else if(family==='scalar'){
+   const name=chartCatalog.scalar.find(x=>x.id===id)?.title||id;
+   series=[{name,type:'line',data:rows.map(r=>r[id]??null),smooth:false,showSymbol:false}];
+   desc.textContent='独立计算的历史指标：'+name+'。仅统计过去，不推断未来。';
+ }else{
+   const modulus=Number(id);
+   groups=Array.from({length:modulus},(_,i)=>i);
+   series=groups.map(i=>({
+      name:family==='residue'?'余'+i:'区间'+(i+1),
+      type:'line',
+      data:rows.map(r=>family==='residue'?r.residues[id]?.[i]??null:r.ranges[id]?.[i]??null),
+      smooth:false,showSymbol:false
+   }));
+   desc.textContent=family==='residue'?'按号码对'+id+'取余（余0至余'+(modulus-1)+'）分组，纵轴为每期开奖个数。':'按1—80顺序划分成'+id+'个尽可能等宽的区间，纵轴为每期开奖个数；这属于独立定义，并非所有原站区间设置。';
+ }
+ if(!globalThis.echarts){holder.textContent='此图需要 ECharts，请检查静态资源加载。';return;}
+ if(!chartFamilyInstance)chartFamilyInstance=echarts.init(holder,null,{renderer:'canvas'});
+ chartFamilyInstance.setOption({
+   animationDuration:350,
+   color:['#d6542c','#247f99','#57966f','#9555a4','#b28b39','#2d5669','#b65770','#6b8d3d'],
+   tooltip:{trigger:'axis',axisPointer:{type:'cross'}},
+   legend:{type:'scroll',top:3,show:series.length>1},
+   toolbox:{feature:{saveAsImage:{title:'保存图表'},restore:{title:'复原'}}},
+   grid:{left:48,right:20,top:series.length>1?50:34,bottom:62},
+   xAxis:{type:'category',data:rows.map(r=>r.issue),axisLabel:{hideOverlap:true}},
+   yAxis:{type:'value',scale:family==='position',min:family==='position'?1:0},
+   dataZoom:[{type:'inside',start:Math.max(0,100-50/Math.max(1,rows.length)*100),end:100},{type:'slider',bottom:10,height:20}],
+   series
+ },true);
+ chartFamilyInstance.resize();
+}
+$('charts-family').onchange=chartFamilySelection;
+$('charts-family-item').onchange=renderChartFamily;
+window.addEventListener('resize',()=>chartFamilyInstance?.resize());
