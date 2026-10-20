@@ -29,10 +29,68 @@ SYMMETRIC = [
     [22,27,26,42,47,46,72,77,76],
 ]
 
+# Additional published 9x9 arrangements verified against public chart text.
+LOOSENED = [
+[4,9,2,3,5,7,8,1,6],
+[35,37,38,31,36,30,80,10,14],
+[33,52,53,55,57,58,51,20,19],
+[32,59,74,79,72,73,56,40,12],
+[39,54,66,76,None,75,64,60,13],
+[34,46,61,71,78,77,69,70,15],
+[26,41,68,67,65,63,62,50,17],
+[21,48,47,45,43,42,49,44,18],
+[28,27,25,23,22,29,24,16,11],
+]
+WOUND = [
+[79,72,73,75,77,78,71,76,None],
+[74,70,50,44,49,42,43,45,47],
+[66,60,22,23,25,27,28,21,48],
+[61,40,29,8,1,6,14,26,41],
+[68,20,24,7,4,9,19,34,46],
+[67,10,16,5,3,2,12,39,54],
+[65,80,11,18,17,15,13,32,59],
+[63,30,36,31,38,37,35,33,52],
+[62,69,64,56,51,58,57,55,53],
+]
+ZIGZAG = [
+[4,9,7,8,17,18,34,39,44],
+[2,5,1,15,11,26,32,50,49],
+[3,6,13,16,21,33,70,42,58],
+[14,12,24,28,35,60,43,57,51],
+[19,29,27,37,40,45,55,56,66],
+[22,25,38,20,47,53,64,61,74],
+[23,31,10,48,52,69,68,79,78],
+[36,80,41,59,62,67,72,77,71],
+[30,46,54,63,65,73,75,76,None],
+]
+FOLDED = [
+[4,9,2,3,5,7,8,1,6],
+[16,11,18,17,15,13,12,19,14],
+[24,29,22,23,25,27,28,21,26],
+[36,31,38,37,35,33,32,39,34],
+[30,80,10,20,40,60,70,50,44],
+[54,46,41,48,47,45,43,42,49],
+[59,52,53,55,57,58,51,56,64],
+[74,66,61,68,67,65,63,62,69],
+[79,72,73,75,77,78,71,76,None],
+]
+LAYOUTS = {
+    "standard": STANDARD,
+    "symmetric": SYMMETRIC,
+    "loosened": LOOSENED,
+    "wound": WOUND,
+    "zigzag": ZIGZAG,
+    "folded": FOLDED,
+}
+for key, rows in LAYOUTS.items():
+    assert len(rows) == 9 and all(len(row) == 9 for row in rows), key
+    assert sorted(n for row in rows for n in row if n is not None) == list(range(1,81)), key
+    assert sum(n is None for row in rows for n in row) == 1, key
+
 def grid(name):
-    if name not in ("standard", "symmetric"):
+    if name not in LAYOUTS:
         raise ValueError("Unknown verified nine-square layout")
-    rows = STANDARD if name == "standard" else SYMMETRIC
+    rows = LAYOUTS[name]
     return [row[:] for row in rows]
 
 def grid_hits(name, numbers):
