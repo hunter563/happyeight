@@ -11,6 +11,16 @@ class NineSquareTests(unittest.TestCase):
             self.assertEqual(sum(n is None for row in rows for n in row),1)
             mask=grid_hits(mode,list(range(1,21)))
             self.assertEqual(sum(v is True for row in mask for v in row),20)
+    def test_rotation_grids(self):
+        for mode, expected in (("even_rotation",list(range(2,81,2))),("odd_rotation",list(range(1,80,2)))):
+            rows=grid(mode)
+            self.assertEqual(len(rows),9)
+            self.assertTrue(all(len(row)==9 for row in rows))
+            self.assertEqual(sorted(n for row in rows for n in row if n is not None),expected)
+            self.assertEqual(sum(n is None for row in rows for n in row),41)
+            mask=grid_hits(mode,list(range(1,21)))
+            self.assertEqual(sum(v is True for row in mask for v in row),10)
+
     def test_unknown(self):
         with self.assertRaises(ValueError):
             grid("unknown")
