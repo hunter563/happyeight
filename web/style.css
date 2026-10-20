@@ -26,3 +26,7 @@
 #charts-range-from,#charts-range-to{width:210px;max-width:38vw;accent-color:var(--accent)}
 #charts-line-reset{align-self:flex-end}
 @media(max-width:650px){.charts-line svg{min-height:175px}#charts-range-from,#charts-range-to{max-width:43vw}}
+
+/* Apache ECharts needs an explicit container height, unlike the SVG fallback. */
+#charts-line{min-height:340px;height:340px}
+@media(max-width:650px){#charts-line{height:270px;min-height:270px}}
