@@ -60,8 +60,8 @@ async function loadCharts(){
  const rows=data.rows.slice().reverse();
  $('charts-status').textContent=`已载入${data.count}期历史数据。指标仅用于描述历史，不提供预测保证。`;
  $('charts-metrics').innerHTML=metric('分析样本',data.count,'历史期数')+metric('最新期号',rows[0]?.issue||'无')+metric('号码总出现次数',data.count*20)+metric('单号码随机期望',data.frequency.expected_frequency.toFixed(2),'仅作为比较基准');
- $('charts-history').innerHTML=rows.map(r=>`<tr><td>${esc(r.issue)}</td><td>${r.sum}</td><td>${r.span}</td><td>${r.odd}</td><td>${r.even}</td><td>${r.large}</td><td>${r.small}</td><td>${r.repeatFromPrevious??'—'}</td></tr>`).join('');
- $('charts-frequencies').innerHTML=Array.from({length:80},(_,i)=>i+1).map(n=>`<div class="number-cell"><strong>${String(n).padStart(2,'0')}</strong><small>出现 ${data.frequency.frequency[n]} · 遗漏 ${data.frequency.omission[n]}</small></div>`).join('');
+ $('charts-history').innerHTML=rows.map(r=>`<tr><td>${esc(r.issue)}</td><td>${r.sum}</td><td>${r.span}</td><td>${r.odd}</td><td>${r.even}</td><td>${r.large}</td><td>${r.small}</td><td>${r.repeatFromPrevious??'—'}</td><td>${r.trend.overlapKnown?r.trend.adjacent:'—'}</td><td>${r.trend.overlapKnown?r.trend.adjacentNew:'—'}</td><td>${r.trend.decadeDistribution.join(' / ')}</td></tr>`).join('');
+ $('charts-frequencies').innerHTML=Array.from({length:80},(_,i)=>i+1).map(n=>`<div class="number-cell"><strong>${String(n).padStart(2,'0')}</strong><small>出现 ${data.frequency.frequency[n]} · 遗漏 ${data.frequency.omission[n]} · 连出 ${data.streakSummary[n].currentRun}</small></div>`).join('');
  renderChartGrid();
  renderPositions();
 }
