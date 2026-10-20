@@ -81,7 +81,7 @@ def make_handler(store, access_username=None, access_password=None):
             elif url.path=='/api/export':
                 self.send(200,[{k:d[k] for k in ('issue','date','numbers')} for d in store.draws()])
             else:
-                name={'/':'index.html','/app.js':'app.js','/style.css':'style.css'}.get(url.path)
+                name={'/':'index.html','/app.js':'app.js','/style.css':'style.css','/vendor/echarts.min.js':'vendor/echarts.min.js'}.get(url.path)
                 if not name: return self.send(404,{'error':'页面不存在'})
                 path=ROOT/'web'/name
                 self.send(200,path.read_bytes(),(mimetypes.guess_type(name)[0] or 'text/plain')+'; charset=utf-8')
