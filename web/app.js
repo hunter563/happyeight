@@ -6,7 +6,7 @@ const metric=(label,value,note='')=>`<div class="metric"><small>${esc(label)}</s
 function message(text,error=false){$('message').textContent=text;$('message').classList.toggle('error',error);}
 async function api(url,body){const r=await fetch(url,body===undefined?{}:{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const data=await r.json();if(!r.ok)throw new Error(data.error||'请求失败');return data;}
 async function busy(id,task){const b=$(id),old=b.textContent;b.disabled=true;b.textContent='处理中…';try{await task();}catch(e){message(e.message,true);}finally{b.disabled=false;b.textContent=old;}}
-function tab(name){if(!['prediction','backtest','overview','records'].includes(name))name='prediction';document.querySelectorAll('[data-tab]').forEach(b=>b.classList.toggle('active',b.dataset.tab===name));document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('active',p.id===name));if(name==='records')loadRecords().catch(e=>message(e.message,true));}
+function tab(name){if(!['prediction','backtest','overview','records','charts'].includes(name))name='prediction';document.querySelectorAll('[data-tab]').forEach(b=>b.classList.toggle('active',b.dataset.tab===name));document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('active',p.id===name));if(name==='records')loadRecords().catch(e=>message(e.message,true));if(name==='charts')loadCharts().catch(e=>message(e.message,true));}
 document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{location.hash=b.dataset.tab;tab(b.dataset.tab);});
 window.addEventListener('hashchange',()=>tab(location.hash.slice(1)));tab(location.hash.slice(1));
 async function refresh(){
@@ -42,3 +42,25 @@ async function loadRecords(){const rows=await api('/api/experiments');$('records
 $('reload-records').onclick=()=>busy('reload-records',loadRecords);
 $('load-archive').onclick=()=>busy('load-archive',async()=>{$('archive-result').innerHTML=renderRecords((await api('/api/experiments?includeArchived=1')).filter(r=>r.archived),true);});
 refresh().catch(e=>message(e.message,true));
+
+let cachedCharts=null;
+function renderChartGrid(){
+ if(!cachedCharts)return;
+ const mode=$('charts-grid').value,rows=cachedCharts.nineSquareLayouts[mode]||[];
+ const drawn=new Set(cachedCharts.rows.at(-1)?.numbers||[]);
+ $('charts-square').innerHTML=rows.flat().map(n=>`<span class="nine-cell${n!==null&&drawn.has(n)?' drawn':''}" title="${n===null?'空格':n}">${n===null?'':String(n).padStart(2,'0')}</span>`).join('');
+}
+async function loadCharts(){
+ $('charts-status').textContent='正在读取历史统计…';
+ const data=await api('/api/chart-series?limit='+encodeURIComponent($('charts-limit').value));
+ cachedCharts=data;
+ const rows=data.rows.slice().reverse();
+ $('charts-status').textContent=`已载入${data.count}期历史数据。指标仅用于描述历史，不提供预测保证。`;
+ $('charts-metrics').innerHTML=metric('分析样本',data.count,'历史期数')+metric('最新期号',rows[0]?.issue||'无')+metric('号码总出现次数',data.count*20)+metric('单号码随机期望',data.frequency.expected_frequency.toFixed(2),'仅作为比较基准');
+ $('charts-history').innerHTML=rows.map(r=>`<tr><td>${esc(r.issue)}</td><td>${r.sum}</td><td>${r.span}</td><td>${r.odd}</td><td>${r.even}</td><td>${r.large}</td><td>${r.small}</td><td>${r.repeatFromPrevious??'—'}</td></tr>`).join('');
+ $('charts-frequencies').innerHTML=Array.from({length:80},(_,i)=>i+1).map(n=>`<div class="number-cell"><strong>${String(n).padStart(2,'0')}</strong><small>出现 ${data.frequency.frequency[n]} · 遗漏 ${data.frequency.omission[n]}</small></div>`).join('');
+ renderChartGrid();
+}
+$('charts-load').onclick=()=>busy('charts-load',loadCharts);
+$('charts-limit').onchange=()=>loadCharts().catch(e=>message(e.message,true));
+$('charts-grid').onchange=renderChartGrid;
