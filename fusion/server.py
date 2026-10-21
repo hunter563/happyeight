@@ -21,8 +21,10 @@ from .chart_series import chart_series
 from .chart_ranked import ranking_series
 from .ninesquare_layouts import LAYOUTS, HALF_LAYOUTS
 from .prediction import predict, prediction_context
+from .lotteries import LotteryStore, analyze_lottery, parse_lottery_csv, game_spec
 
 def make_handler(store, access_username=None, access_password=None):
+    lotteries = LotteryStore(store)
     username=access_username if access_username is not None else os.environ.get('KL8_ACCESS_USERNAME','happy8')
     password=access_password if access_password is not None else os.environ.get('KL8_ACCESS_PASSWORD','')
     expected=base64.b64encode(f'{username}:{password}'.encode())
@@ -60,7 +62,24 @@ def make_handler(store, access_username=None, access_password=None):
 
         def get(self):
             url=urlsplit(self.path); q=parse_qs(url.query)
-            if url.path=='/api/status':
+            if url.path=='/api/lotteries':
+                self.send(200,{'games':lotteries.catalog()})
+            elif url.path.startswith('/api/lotteries/'):
+                parts=url.path.strip('/').split('/')
+                if len(parts) not in (3,4) or (len(parts)==4 and parts[3]!='export'):
+                    return self.send(404,{'error':'接口不存在'})
+                game=parts[2]; game_spec(game)
+                if len(parts)==4:
+                    self.send(200,{'game':game,'draws':lotteries.draws(game)},headers={'Content-Disposition':f'attachment; filename="{game}-history.json"'})
+                else:
+                    if any(len(values)!=1 for values in q.values()):
+                        raise ValueError('查询参数不能重复')
+                    if set(q)-{'limit','from','to','version','field'}:
+                        raise ValueError('不支持的查询参数')
+                    self.send(200,analyze_lottery(lotteries.draws(game),game,
+                        int(q.get('limit',['50'])[0]),q.get('from',[None])[0],q.get('to',[None])[0],
+                        q.get('version',['current'])[0],q.get('field',['primary'])[0]))
+            elif url.path=='/api/status':
                 draws=store.draws();latest=draws[-1] if draws else None
                 today=datetime.now(ZoneInfo('Asia/Shanghai')).date()
                 age=(today-datetime.fromisoformat(latest['date']).date()).days if latest else None
@@ -84,7 +103,9 @@ def make_handler(store, access_username=None, access_password=None):
             elif url.path=='/api/export':
                 self.send(200,[{k:d[k] for k in ('issue','date','numbers')} for d in store.draws()])
             else:
-                name={'/':'index.html','/app.js':'app.js','/style.css':'style.css','/vendor/echarts.min.js':'vendor/echarts.min.js'}.get(url.path)
+                name={'/':'index.html','/app.js':'app.js','/style.css':'style.css',
+                      '/lotteries':'lotteries.html','/lotteries.js':'lotteries.js','/lotteries.css':'lotteries.css',
+                      '/vendor/echarts.min.js':'vendor/echarts.min.js'}.get(url.path)
                 if not name: return self.send(404,{'error':'页面不存在'})
                 path=ROOT/'web'/name
                 self.send(200,path.read_bytes(),(mimetypes.guess_type(name)[0] or 'text/plain')+'; charset=utf-8')
@@ -102,8 +123,18 @@ def make_handler(store, access_username=None, access_password=None):
             size=int(self.headers.get('Content-Length',0))
             if not 0<size<=2_000_000: return self.send(413,{'error':'请求大小不合法（上限2MB）'})
             body=json.loads(self.rfile.read(size))
+            if not isinstance(body,dict): raise ValueError('请求正文须为JSON对象')
             route=urlsplit(self.path).path
-            if route in ('/api/geometry/predict','/api/geometry/backtest'):
+            if route.startswith('/api/lotteries/'):
+                parts=route.strip('/').split('/')
+                if len(parts)!=4 or parts[3]!='import':
+                    return self.send(404,{'error':'接口不存在'})
+                game=parts[2]; game_spec(game)
+                if body.get('game',game)!=game: raise ValueError('文件彩种与导入目标不一致')
+                if ('csv' in body)==('draws' in body): raise ValueError('请提供csv或draws中的一个')
+                rows=parse_lottery_csv(body['csv']) if 'csv' in body else body['draws']
+                self.send(200,lotteries.import_draws(game,rows,body.get('source','用户导入；未经逐期官方核验')))
+            elif route in ('/api/geometry/predict','/api/geometry/backtest'):
                 return self.send(410,{'error':'独立图形预测已停用，后台仅保留固定评分筛选规则','activeRule':VERSION})
             elif route in ('/api/predict','/api/experiments'):
                 validate_options(body.get('k'),body.get('window'))
