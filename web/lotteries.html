@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>八彩 · 开奖分析台</title><link rel="stylesheet" href="/lotteries.css"><script defer src="/lotteries.js"></script></head>
+<body>
+<aside class="sidebar">
+  <a href="/lotteries" class="brand"><span class="brand-mark">八</span><span>八彩<small>开奖分析台 · 研究版</small></span></a>
+  <p class="nav-caption">数字彩 / 08</p><nav id="games" aria-label="选择彩种"></nav>
+  <div class="sidebar-note"><span class="dot"></span> 历史数据观察室<p>了解已经发生的开奖。<br>统计不代表下一期概率。</p><a href="/">快乐8固定规则研究台 ↗</a></div>
+</aside>
+<main>
+  <header class="topbar"><span>数据 / 数字彩分析</span><span class="edition">第一期开发版</span></header>
+  <section class="heading"><div><p class="eyebrow">LOTTERY OBSERVATORY</p><h1 id="game-title">正在载入…</h1><p id="game-rule" class="muted">读取彩种规则和库内数据</p></div><button id="reload" class="quiet">刷新数据 ↻</button></section>
+  <div id="message" role="status" aria-live="polite"></div>
+  <section class="summary-grid" aria-label="数据概况">
+    <article class="card latest"><div class="card-top"><h2>窗口内最新开奖</h2><span id="latest-issue" class="muted">—</span></div><div id="latest-balls" class="balls"></div><p id="latest-source" class="small muted">数据来源待载入</p></article>
+    <article class="card number-card"><h2>已入库开奖</h2><strong id="total">—</strong><p id="freshness" class="small muted">尚未读取</p></article>
+    <article class="card number-card tint"><h2>当前分析窗口</h2><strong><span id="window-count">—</span><small> 期</small></strong><p id="window-range" class="small muted">—</p></article>
+  </section>
+  <section class="card workspace">
+    <div class="card-top"><div><p class="eyebrow">HISTORY, IN PERSPECTIVE</p><h2>走势工作区</h2></div><span id="field-badge" class="pill">历史统计</span></div>
+    <form id="filters" class="filters">
+      <label>期数<select id="limit"><option>30</option><option selected>50</option><option>100</option><option>200</option><option>300</option></select></label>
+      <label>号码区 / 位置<select id="field"><option value="primary">主号码区</option></select></label>
+      <label id="version-label" hidden>七星彩规则<select id="version"><option value="current">20100期起 · 末位0—14</option><option value="legacy">20100期前 · 末位0—9</option></select></label>
+      <label>起始期号<input id="from" inputmode="numeric" maxlength="7" placeholder="不限"></label><label>结束期号<input id="to" inputmode="numeric" maxlength="7" placeholder="不限"></label><button type="submit" class="primary">应用范围</button>
+    </form>
+    <p id="definitions" class="small muted"></p>
+    <nav class="tabs" aria-label="分析视图"><button data-view="distribution" class="active" aria-pressed="true">号码分布</button><button data-view="frequency" aria-pressed="false">频次与遗漏</button><button data-view="trend" aria-pressed="false">指标走势</button><button data-view="history" aria-pressed="false">开奖记录</button></nav>
+    <div id="empty" class="empty" hidden><div class="empty-symbol">◎</div><h3 id="empty-title">这个彩种还没有入库数据</h3><p id="empty-text">规则和分析功能已经就绪。导入真实开奖文件后，即可查看走势。</p><button id="open-import" class="primary">导入开奖文件</button></div>
+    <div id="analysis">
+      <section id="distribution" class="view"><div class="view-tools"><p class="small muted">圆点为开出号码；有序数字的重复次数显示为 ×N。</p><div class="inline"><label><input id="omissions" type="checkbox" checked>显示遗漏</label><label>排列<select id="order"><option value="desc">最新在前</option><option value="asc">最早在前</option></select></label></div></div><div class="scroll" tabindex="0" aria-label="号码分布，可横向滚动"><table id="distribution-table" class="distribution-table"></table></div></section>
+      <section id="frequency" class="view" hidden><div class="view-tools"><p class="small muted">频次按号码实际出现次数计数，包含同一期的重复数字；≥表示更早记录未知。</p><label>排序<select id="frequency-sort"><option value="number">号码顺序</option><option value="count">出现次数多到少</option><option value="omission">遗漏多到少</option></select></label></div><div id="frequency-grid" class="frequency-grid"></div></section>
+      <section id="trend" class="view" hidden><div class="view-tools"><p class="small muted">仅统计当前号码区或位置，按开奖先后绘制。</p><label>指标<select id="metric"><option value="sum">和值</option><option value="span">跨度</option><option value="odd">奇数个数</option><option value="big">大号个数</option><option value="repeat">与库内上条记录相同的不同号码数</option><option value="amplitude">单个位置振幅</option></select></label></div><div id="line-chart" class="line-chart"></div><p id="line-summary" class="small muted"></p><div class="scroll"><table><thead><tr><th>期号</th><th>和值</th><th>跨度</th><th>奇 : 偶</th><th>大 : 小</th><th>0 : 1 : 2路</th><th>重号</th><th>振幅</th></tr></thead><tbody id="metrics-body"></tbody></table></div></section>
+      <section id="history" class="view" hidden><p class="small muted">该表展示完整开奖号。第二号码区保持独立，有序数字保留位置与重复。</p><div class="scroll"><table><thead><tr><th>期号</th><th>开奖日期</th><th>开奖号码</th><th>入库来源</th></tr></thead><tbody id="history-body"></tbody></table></div></section>
+    </div>
+  </section>
+  <details id="data-workspace" class="card data-workspace"><summary>数据工作区 <span class="muted">导入 / 导出 / 来源说明</span></summary><div class="data-content"><div><h3>为当前彩种导入开奖</h3><p class="muted small">支持CSV或JSON，单次最多2MB。同一期冲突时整批取消，原记录不会被覆盖。导入文件中的号码不进行官方真实性背书。</p><label>数据来源说明<input id="source" maxlength="300" value="用户导入；未经逐期官方核验"></label><label class="file-button">选择 CSV / JSON<input id="import-file" type="file" accept=".csv,.json"></label><a id="export" class="button quiet" href="/api/lotteries/ssq/export" download>导出当前彩种</a><button id="sync" class="quiet" hidden>同步快乐8公开数据</button><p id="import-status" class="small" role="status" aria-live="polite"></p></div><div><h3>文件格式</h3><p class="small muted">CSV列名：</p><code>issue,date,primary,secondary</code><p id="format-note" class="small muted"></p><p class="small muted">JSON：对象包含game和draws，或直接使用记录数组。每条记录包含issue、date、primary、secondary。期号支持7位或5位；日期为YYYY-MM-DD。号码可用数组或空格分隔文本。</p><p class="small muted">目前仅快乐8沿用既有在线同步；其余7种通过文件导入。没有自动采集图感觉或乐彩网的付费内容。</p></div></div></details>
+  <footer>八彩 · 历史开奖分析<span>不提供购彩、代购或中奖承诺</span></footer>
+</main>
+</body></html>
